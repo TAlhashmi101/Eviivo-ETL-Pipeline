@@ -37,6 +37,15 @@
     .calendar-room-cell-even { background: rgba(15, 23, 42, 0.96); }
     .calendar-room-cell-odd { background: rgba(15, 23, 42, 1); }
     .table-row-hover:hover { background-color: rgba(30, 41, 59, 0.7); cursor: pointer; }
+    .booking-modal-header-cancelled { background: #991b1b !important; color: #fff !important; border-color: #f87171 !important; }
+    .booking-modal-header-cancelled .text-slate-500 { color: #fecaca !important; }
+    .booking-modal-header-parked { background: #000 !important; color: #fff !important; border-color: #475569 !important; }
+    .booking-modal-header-parked .text-slate-500 { color: #cbd5e1 !important; }
+    .status-cancelled { background: #991b1b !important; color: #fee2e2 !important; border-color: #f87171 !important; }
+    .status-parked { background: #000 !important; color: #f8fafc !important; border-color: #64748b !important; }
+    .group-booking-icon { color: #a78bfa; margin-left: .25rem; }
+    table th { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    table th > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
     
     /* Overbooking Stripes & Hover Effects */
     .bg-striped { background-image: repeating-linear-gradient(45deg, rgba(255,255,255,0.1) 0px, rgba(255,255,255,0.1) 8px, transparent 8px, transparent 16px); }
@@ -210,9 +219,9 @@
         </div>
         <div class="px-3 py-2 border-b border-slate-800 flex flex-wrap items-center gap-3 text-[10px] text-slate-400"><span class="font-bold uppercase text-slate-500">Status</span><span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-rose-500"></i>Post-Departure Debt</span><span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-amber-400"></i>In-House Unpaid</span><span class="flex items-center gap-1"><i class="w-2 h-2 rounded-full bg-sky-400"></i>Upcoming Deposit Due</span><span id="overview-filter-label" class="ml-auto text-emerald-300"></span></div>
         <div class="overflow-x-auto w-full">
-          <table class="w-full text-left text-[11px] text-slate-300 table-compact">
+          <table id="recon-table" class="w-full text-left text-[11px] text-slate-300 table-compact">
             <thead class="bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr><th>Property<br><input id="ledger-property-filter" oninput="debounceLedgerFilter()" placeholder="Filter" class="mt-1 w-24 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[9px] font-normal normal-case"></th><th>Booking Ref</th><th>Guest Name<br><input id="ledger-guest-filter" oninput="debounceLedgerFilter()" placeholder="Filter" class="mt-1 w-24 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[9px] font-normal normal-case"></th><th>Exception</th><th>Check-Out<br><input id="ledger-checkout-filter" type="date" onchange="fetchReconciliation(0)" class="mt-1 w-28 bg-slate-950 border border-slate-700 rounded px-1 py-0.5 text-[9px] font-normal"></th><th class="text-right">Net Total</th><th class="text-right">Paid</th><th class="text-right">Balance</th></tr>
+              <tr><th>PROPERTY</th><th>REF</th><th>GUEST</th><th>EXCEPTION</th><th>DEPART</th><th class="text-right">TOTAL</th><th class="text-right">PAID</th><th class="text-right">BALANCE</th></tr>
             </thead>
             <tbody id="recon-tbody" class="divide-y divide-slate-800/60"></tbody>
           </table>
@@ -234,6 +243,7 @@
             <div><label class="block text-[9px] font-bold text-slate-400 uppercase mb-1">Settlement month</label><input id="month-end-month" type="month" onchange="loadMonthEndReconciliation()" class="bg-slate-950 border border-slate-700 text-slate-100 text-xs rounded-lg px-2 py-1.5 focus:outline-none"></div>
           </div>
         </div>
+        <div id="smart-brief-container" class="alert alert-info mt-4 rounded-lg border border-cyan-500/30 bg-cyan-950/20 px-3 py-3 text-cyan-100" style="font-size: 1.1rem; font-weight: 500;" aria-live="polite">Select a property and month to see the executive summary.</div>
         <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4 mt-5">
           <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
             <div class="flex items-center justify-between gap-2"><h3 class="text-xs font-bold text-amber-300 uppercase">Petty Cash Tracker</h3><span id="expense-status" class="text-[10px] text-slate-500" aria-live="polite"></span></div>
@@ -245,7 +255,7 @@
               <input name="description" required placeholder="Description (worker fees, supplies...)" class="sm:col-span-2 bg-slate-900 border border-slate-700 text-slate-100 text-xs rounded px-2 py-1.5 focus:outline-none">
               <button id="expense-submit" type="submit" class="sm:col-span-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded"><i class="fa-solid fa-receipt mr-1"></i>Add Expense</button>
             </form>
-            <div class="overflow-x-auto mt-4"><table class="w-full text-left text-[10px] text-slate-300"><thead class="text-slate-500 uppercase border-b border-slate-800"><tr><th class="py-2">Date</th><th>Description</th><th class="text-right">Amount</th><th class="text-right">Receipt</th><th class="text-right">Actions</th></tr></thead><tbody id="petty-expenses-body"><tr><td colspan="5" class="py-4 text-center text-slate-500">Select a property to load expenses.</td></tr></tbody></table></div>
+            <div class="overflow-x-auto mt-4"><table class="w-full text-left text-[10px] text-slate-300"><thead class="text-slate-500 uppercase border-b border-slate-800"><tr><th class="py-2">DATE</th><th>DESC</th><th class="text-right">AMOUNT</th><th class="text-right">RECEIPT</th><th class="text-right">ACTION</th></tr></thead><tbody id="petty-expenses-body"><tr><td colspan="5" class="py-4 text-center text-slate-500">Select a property to load expenses.</td></tr></tbody></table></div>
           </div>
           <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-4">
             <div class="flex items-center justify-between gap-2"><h3 class="text-xs font-bold text-cyan-300 uppercase">Month-End Closer (الختمة)</h3><span id="month-lock-badge" class="hidden px-2 py-1 rounded bg-emerald-900/50 text-emerald-300 text-[10px] font-bold">SEALED / LOCKED</span></div>
@@ -256,7 +266,7 @@
       </section>
       <section class="bg-slate-900 border border-cyan-500/30 rounded-xl p-4 shadow-xl">
         <div class="flex flex-wrap items-center justify-between gap-2"><div><div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider"><i class="fa-solid fa-list-check mr-1"></i>Detailed Cash Ledger</div><h2 class="text-lg font-bold text-white mt-1">Filtered Period Transactions</h2><p class="text-[10px] text-slate-500 mt-1">Every cash payment contributing to Total System Cash.</p></div><span id="cash-ledger-count" class="text-[10px] text-slate-400">0 transactions</span></div>
-        <div class="overflow-x-auto mt-4"><table class="w-full text-left text-[11px] text-slate-300 table-compact"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th>Date</th><th>Booking Reference</th><th>Room</th><th>Guest</th><th>Payment Method</th><th class="text-right">Amount</th></tr></thead><tbody id="cash-ledger-body"><tr><td colspan="6" class="p-5 text-center text-slate-500">Select a property and month to load cash transactions.</td></tr></tbody></table></div>
+        <div class="overflow-x-auto mt-4"><table id="cash-ledger-table" class="w-full text-left text-[11px] text-slate-300 table-compact"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th>DATE</th><th>REF</th><th>ROOM</th><th>GUEST</th><th>METHOD</th><th class="text-right">AMOUNT</th></tr></thead><tbody id="cash-ledger-body"><tr><td colspan="6" class="p-5 text-center text-slate-500">Select a property and month to load cash transactions.</td></tr></tbody></table></div>
       </section>
       <section class="bg-slate-900 border border-amber-500/30 rounded-xl p-4 shadow-xl">
         <div class="flex flex-wrap items-end justify-between gap-4">
@@ -276,7 +286,7 @@
         </div>
         <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800">
           <span id="reconciliation-status" class="text-[10px] text-slate-500" aria-live="polite">No reconciliation run yet.</span>
-          <div class="flex items-center gap-2"><button id="reconciliation-run-btn" onclick="runReconciliation()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg"><i class="fa-solid fa-play mr-1"></i>Run Reconciliation</button><button onclick="exportReconciliation()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg"><i class="fa-solid fa-file-export mr-1 text-amber-300"></i>Export Discrepancies</button></div>
+          <div class="flex items-center gap-2"><button id="reconciliation-run-btn" onclick="void runReconciliation()" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg"><i class="fa-solid fa-play mr-1"></i>Run Reconciliation</button><button onclick="exportReconciliation()" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold rounded-lg"><i class="fa-solid fa-file-export mr-1 text-amber-300"></i>Export Discrepancies</button></div>
         </div>
       </section>
 
@@ -298,8 +308,8 @@
         </div>
       </section>
 
-      <section class="bg-slate-900 border border-orange-500/20 rounded-xl overflow-hidden shadow-lg"><div class="p-3 border-b border-slate-800"><h2 class="text-xs font-bold text-white uppercase tracking-wide">Missing in System <span class="text-[10px] text-slate-500 normal-case">Exists in sheet, not in PostgreSQL</span></h2></div><div class="overflow-x-auto"><table class="w-full text-left text-[11px] table-compact"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th>Booking Ref</th><th>Check-in Date</th><th>Guest Name</th><th class="text-right">Action</th></tr></thead><tbody id="reconciliation-missing-system-body" class="divide-y divide-slate-800 text-slate-300"><tr><td colspan="4" class="p-5 text-center text-slate-500">Run reconciliation to load results.</td></tr></tbody></table></div></section>
-      <section class="bg-slate-900 border border-sky-500/20 rounded-xl overflow-hidden shadow-lg"><div class="p-3 border-b border-slate-800"><h2 class="text-xs font-bold text-white uppercase tracking-wide">Missing in Sheet <span class="text-[10px] text-slate-500 normal-case">Exists in PostgreSQL, not in sheet</span></h2></div><div class="overflow-x-auto"><table id="reconciliation-missing-sheet-table" class="table-fixed w-full text-left text-sm table-compact select-text"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th class="w-[100px]">Date</th><th class="w-[200px]">Flats</th><th class="w-1 px-0 border-0 opacity-0" aria-label="Hidden Column C"></th><th class="w-1 px-0 border-0 opacity-0">Check</th><th class="w-1 px-0 border-0 opacity-0">Out</th><th class="w-1 px-0 border-0 opacity-0">In</th><th class="w-[250px]">Notes</th><th class="w-[120px]">Phone</th><th class="w-[150px]">Name</th><th class="w-[60px]">Guest</th><th class="w-[60px]">Nights</th><th class="w-[100px]">Source</th><th class="w-[120px]">Payment</th><th class="w-[90px]">Room Rate</th><th class="w-[100px]">Status</th><th class="w-[90px]">Other Rev.</th><th class="w-[90px]">Total</th><th class="w-[130px]">Booking_Number</th><th data-column="METHOD_OF_PAYMENT" class="w-[160px] whitespace-normal break-words leading-tight">Method_of_Payment</th><th data-column="EMAIL" class="w-[180px] truncate">Email</th></tr></thead><tbody id="reconciliation-missing-sheet-body" class="divide-y divide-slate-800 text-slate-300 select-text"><tr><td colspan="20" class="p-5 text-center text-slate-500">Run reconciliation to load results.</td></tr></tbody></table></div></section>
+      <section class="bg-slate-900 border border-orange-500/20 rounded-xl overflow-hidden shadow-lg"><div class="p-3 border-b border-slate-800"><h2 class="text-xs font-bold text-white uppercase tracking-wide">Missing in System <span class="text-[10px] text-slate-500 normal-case">Exists in sheet, not in PostgreSQL</span></h2></div><div class="overflow-x-auto"><table class="w-full text-left text-[11px] table-compact"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th>REF</th><th>ARRIVE</th><th>GUEST</th><th class="text-right">ACTION</th></tr></thead><tbody id="reconciliation-missing-system-body" class="divide-y divide-slate-800 text-slate-300"><tr><td colspan="4" class="p-5 text-center text-slate-500">Run reconciliation to load results.</td></tr></tbody></table></div></section>
+      <section class="bg-slate-900 border border-sky-500/20 rounded-xl overflow-hidden shadow-lg"><div class="p-3 border-b border-slate-800"><h2 class="text-xs font-bold text-white uppercase tracking-wide">Missing in Sheet <span class="text-[10px] text-slate-500 normal-case">Exists in PostgreSQL, not in sheet</span></h2></div><div class="overflow-x-auto"><table id="reconciliation-missing-sheet-table" class="table-fixed w-full text-left text-sm table-compact select-text"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th class="w-[100px]">DATE</th><th class="w-[200px]">FLAT</th><th class="w-1 px-0 border-0 opacity-0" aria-label="Hidden Column C">C</th><th class="w-1 px-0 border-0 opacity-0">CHECK</th><th class="w-1 px-0 border-0 opacity-0">OUT</th><th class="w-1 px-0 border-0 opacity-0">IN</th><th class="w-[250px]">NOTES</th><th class="w-[120px]">PHONE</th><th class="w-[150px]">NAME</th><th class="w-[60px]">GUEST</th><th class="w-[60px]">NIGHTS</th><th class="w-[100px]">SOURCE</th><th class="w-[120px]">PAYMENT</th><th class="w-[90px]">RATE</th><th class="w-[100px]">STATUS</th><th class="w-[90px]">OTHER</th><th class="w-[90px]">TOTAL</th><th class="w-[130px]">REF</th><th data-column="METHOD_OF_PAYMENT" class="w-[160px]">METHOD</th><th data-column="EMAIL" class="w-[180px]">EMAIL</th></tr></thead><tbody id="reconciliation-missing-sheet-body" class="divide-y divide-slate-800 text-slate-300 select-text"><tr><td colspan="20" class="p-5 text-center text-slate-500">Run reconciliation to load results.</td></tr></tbody></table></div></section>
     </div>
 
     <!-- TAB 2: AI REPORTS -->
@@ -353,7 +363,7 @@
       <div class="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_340px] gap-5 items-start">
         <section class="task-card overflow-hidden">
           <div class="p-5 border-b border-slate-700/50 flex flex-wrap items-center justify-between gap-3"><div><div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider">Mapping blueprint</div><h3 class="text-base font-bold text-white mt-1">Sheet columns to live database fields</h3><p class="text-[10px] text-slate-400 mt-1">The source selector is loaded from PostgreSQL information_schema.</p></div><button onclick="addTaskMappingRow()" class="task-action px-3 py-2 bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-black rounded-lg"><i class="fa-solid fa-plus mr-1"></i>Add Column</button></div>
-          <div class="overflow-x-auto p-3"><table class="task-mapping-table w-full text-left text-[11px] table-compact"><thead class="text-slate-400 uppercase"><tr><th class="px-3 py-3">Google Sheets column</th><th class="px-3 py-3">Mapping mode</th><th class="px-3 py-3">PostgreSQL field / expression</th><th class="px-3 py-3 text-center">Upsert key</th><th></th></tr></thead><tbody id="task-mapping-body" class="divide-y divide-slate-700/50"></tbody></table></div>
+          <div class="overflow-x-auto p-3"><table class="task-mapping-table w-full text-left text-[11px] table-compact"><thead class="text-slate-400 uppercase"><tr><th class="px-3 py-3">SHEET</th><th class="px-3 py-3">MODE</th><th class="px-3 py-3">FIELD</th><th class="px-3 py-3 text-center">KEY</th><th></th></tr></thead><tbody id="task-mapping-body" class="divide-y divide-slate-700/50"></tbody></table></div>
           <div class="p-5 border-t border-slate-700/50 flex flex-wrap items-center gap-2"><input id="task-preset-name" placeholder="Name this mapping preset" class="bg-slate-950/80 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white min-w-[220px]"><button onclick="saveTaskPreset()" class="task-action px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold rounded-lg"><i class="fa-solid fa-floppy-disk mr-1"></i>Save Preset</button><select id="task-preset-select" onchange="loadSelectedTaskPreset()" class="bg-slate-950/80 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white"><option value="">Saved presets</option></select></div>
         </section>
         <aside class="task-card overflow-hidden"><div class="p-5 border-b border-slate-700/50"><div class="text-[10px] font-bold text-amber-300 uppercase tracking-wider">Delivery preview</div><h3 class="text-base font-bold text-white mt-1">Destination rows</h3><p class="text-[10px] text-slate-400 mt-1">Preview uses the selected task, hotel, date, and mapping.</p></div><div id="task-preview" class="task-preview-shell max-h-[520px] overflow-auto p-3 text-[10px] text-slate-300">Loading live task schema...</div></aside>
@@ -384,15 +394,12 @@
         <div class="p-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <h3 class="text-xs font-bold text-amber-400 uppercase tracking-wide"><i class="fa-solid fa-circle-exclamation mr-1"></i> Outstanding Folios</h3>
           <div class="flex flex-wrap items-center gap-2">
-            <select id="unpaid-name-sort" onchange="fetchUnpaidReservations(0)" title="Sort Guest column" class="px-2.5 py-1 text-[10px] bg-slate-950 border border-slate-700 rounded-lg text-white focus:outline-none"><option value="name_asc">Guest A-Z</option><option value="name_desc">Guest Z-A</option></select>
-            <label class="flex items-center gap-1 text-[10px] text-slate-300 whitespace-nowrap" title="Hide rows where Paid is zero"><input type="checkbox" id="unpaid-hide-zero-paid" onchange="fetchUnpaidReservations(0)" class="accent-emerald-500"> Hide zero Paid</label>
-            <label class="flex items-center gap-1 text-[10px] text-slate-300 whitespace-nowrap" title="Hide rows with no note"><input type="checkbox" id="unpaid-hide-blank-notes" onchange="fetchUnpaidReservations(0)" class="accent-amber-500"> Hide blank Notes</label>
           </div>
         </div>
         <div class="overflow-x-auto w-full">
-          <table class="w-full text-left text-[11px] border-collapse table-compact">
+          <table id="unpaid-table" class="w-full text-left text-[11px] border-collapse table-compact">
             <thead class="bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
-              <tr><th>Ref / Unit</th><th>Guest</th><th>Notes</th><th>Hotel</th><th class="whitespace-nowrap">Stay Dates</th><th class="text-right whitespace-nowrap">Booked</th><th class="text-right whitespace-nowrap">Paid</th><th class="text-right whitespace-nowrap">Due</th></tr>
+              <tr><th>REF</th><th>GUEST</th><th>NOTES</th><th>HOTEL</th><th>STAY</th><th class="text-right">BOOKED</th><th class="text-right">PAID</th><th class="text-right">DUE</th></tr>
             </thead>
             <tbody id="unpaid-tbody" class="divide-y divide-slate-800 text-slate-300">
               <tr><td colspan="8" class="py-8 text-center text-slate-500">Loading unpaid folios...</td></tr>
@@ -482,7 +489,7 @@
           <div class="overflow-x-auto w-full">
             <table id="expected-arrivals-table" class="w-full text-left text-[11px] border-collapse table-compact">
               <thead class="bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
-                <tr><th class="w-[110px]">Ref / Unit</th><th class="w-[150px]">Guest Name</th><th class="w-[170px]">Note / Group</th><th class="w-[140px]">Phone / Contact</th><th class="w-[150px]">Stay Dates</th><th class="w-[100px]">Channel</th><th class="w-[85px] text-right">Booked</th><th class="w-[85px] text-right">Paid</th><th class="w-[100px] text-right">Balance Due</th><th class="w-[120px] text-center">Status</th></tr>
+                <tr><th class="w-[110px]">REF</th><th class="w-[150px]">GUEST</th><th class="w-[170px]">NOTE</th><th class="w-[140px]">CONTACT</th><th class="w-[150px]">STAY</th><th class="w-[100px]">CHANNEL</th><th class="w-[85px] text-right">BOOKED</th><th class="w-[85px] text-right">PAID</th><th class="w-[100px] text-right">DUE</th><th class="w-[120px] text-center">STATUS</th></tr>
               </thead>
               <tbody id="ops-arrivals-tbody" class="divide-y divide-slate-800 text-slate-300">
                 <tr><td colspan="10" class="py-6 text-center text-slate-500">Select a date & property.</td></tr>
@@ -510,7 +517,7 @@
           <div class="overflow-x-auto w-full">
             <table class="w-full text-left text-[11px] border-collapse table-compact">
               <thead class="bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300 text-xs uppercase tracking-wider font-semibold border-b border-slate-200 dark:border-slate-700">
-                <tr><th>Ref / Unit</th><th>Guest Name</th><th>Note / Group</th><th>Phone / Contact</th><th>Stay Dates</th><th>Channel</th><th class="text-right">Booked</th><th class="text-right">Paid</th><th class="text-right">Balance Due</th><th class="text-center">Status</th></tr>
+                <tr><th>REF</th><th>GUEST</th><th>NOTE</th><th>CONTACT</th><th>STAY</th><th>CHANNEL</th><th class="text-right">BOOKED</th><th class="text-right">PAID</th><th class="text-right">DUE</th><th class="text-center">STATUS</th></tr>
               </thead>
               <tbody id="ops-departures-tbody" class="divide-y divide-slate-800 text-slate-300">
                 <tr><td colspan="10" class="py-6 text-center text-slate-500">Select a date & property.</td></tr>
@@ -559,7 +566,7 @@
   </div>
   <aside id="settled-cash-drawer" class="hidden fixed inset-y-0 right-0 z-[55] w-full max-w-2xl bg-slate-900 border-l border-slate-700 shadow-2xl flex flex-col no-print">
     <div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-700"><div><h2 class="text-sm font-bold text-white">Period Settled Payments</h2><p id="settled-cash-scope" class="text-[10px] text-slate-400 mt-1"></p></div><div class="flex items-center gap-2"><select id="settled-cash-method-drawer" onchange="selectSettledCashMethod(this.value, true)" class="bg-slate-950 border border-slate-700 text-slate-200 text-[10px] rounded px-2 py-1"><option value="">All Methods</option></select><select id="settled-cash-export" class="bg-slate-950 border border-slate-700 text-slate-200 text-[10px] rounded px-2 py-1"><option value="csv">CSV</option><option value="pdf">PDF</option></select><button onclick="exportSettledCash()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-[10px] text-white"><i class="fa-solid fa-download mr-1"></i>Save / Export</button><button onclick="closeSettledCashDrawer()" class="text-slate-400 hover:text-white text-lg" aria-label="Close">&times;</button></div></div>
-    <div class="overflow-auto flex-1"><table class="w-full text-left text-[11px] text-slate-300"><thead class="sticky top-0 bg-slate-950 text-slate-400 uppercase text-[9px]"><tr><th class="p-2">Date</th><th class="p-2">Property</th><th class="p-2">Booking Reference</th><th class="p-2">Method</th><th class="p-2 text-right">Amount</th><th class="p-2">Description</th></tr></thead><tbody id="settled-cash-body"></tbody></table></div>
+    <div class="overflow-auto flex-1"><table class="w-full text-left text-[11px] text-slate-300"><thead class="sticky top-0 bg-slate-950 text-slate-400 uppercase text-[9px]"><tr><th class="p-2">DATE</th><th class="p-2">PROPERTY</th><th class="p-2">REF</th><th class="p-2">METHOD</th><th class="p-2 text-right">AMOUNT</th><th class="p-2">DESC</th></tr></thead><tbody id="settled-cash-body"></tbody></table></div>
     <div class="px-4 py-3 border-t border-slate-700 text-right text-sm font-bold text-emerald-300" id="settled-cash-total">£0.00</div>
   </aside>
   <div id="new-booking-modal" class="hidden fixed inset-0 z-[60] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 no-print">
@@ -607,6 +614,7 @@
     let currentOffset = 0;
     let unpaidOffset = 0;
     const opsTableRecords = {};
+    const appState = { bookings: [], bookingsByDate: new Map(), unpaidBookings: [] };
     
     let searchTimer = null;
     let unpaidSearchTimer = null;
@@ -618,16 +626,77 @@
     let aiReportChartInstance = null;
     let overviewFilter = { channel: '', fromDate: '', toDate: '' };
     let overviewGrouping = 'weekly';
-    let ledgerFilterTimer = null;
     let settledCashTransactions = [];
     let settledCashMethods = [];
     let settledCashMethod = '';
+    const bookingCardPaymentState = new Map();
+    const bookingCardTotalState = new Map();
     let currentAiReport = { type: 'daily_sales', rows: [], columns: [], title: 'No report loaded' };
     let currentReconciliation = { missing_in_system: [], missing_in_sheet: [], summary: {} };
 
     const fmt = (num) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(num || 0);
+    const cleanPaymentAmount = value => {
+      const cleaned = String(value ?? '').replace(/[^0-9.-]+/g, '');
+      const amount = Number.parseFloat(cleaned);
+      return Number.isFinite(amount) ? amount : 0;
+    };
+    function updateBookingCardSummary(bookingTotal, paymentsArray, ref = '') {
+      const total = cleanPaymentAmount(bookingTotal);
+      const totalPaid = (Array.isArray(paymentsArray) ? paymentsArray : [])
+        .filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true')
+        .reduce((sum, payment) => sum + cleanPaymentAmount(payment?.amount), 0);
+      const balance = total - totalPaid;
+      const paidElement = document.getElementById(`booking-paid-${ref}`);
+      const balanceElement = document.getElementById(`booking-balance-${ref}`);
+      const dueElement = document.getElementById(`booking-due-${ref}`);
+      if (paidElement) paidElement.textContent = `£${totalPaid.toFixed(2)}`;
+      if (balanceElement) {
+        balanceElement.textContent = `£${balance.toFixed(2)}`;
+        balanceElement.classList.toggle('text-rose-400', balance > 0);
+        balanceElement.classList.toggle('text-emerald-300', balance <= 0);
+      }
+      if (dueElement) {
+        dueElement.textContent = `£${Math.max(0, balance).toFixed(2)}`;
+        dueElement.classList.toggle('text-rose-200', balance > 0);
+        dueElement.classList.toggle('text-emerald-300', balance <= 0);
+      }
+      return { total, totalPaid, balance };
+    }
+    function refreshLocalBookingPaymentSummary(ref) {
+      return updateBookingCardSummary(bookingCardTotalState.get(ref) || 0, bookingCardPaymentState.get(ref) || [], ref);
+    }
     const setElText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    function normalizeBookingStatus(value) {
+      const raw = typeof value === 'object' ? (value?.booking_status ?? value?.status ?? '') : value;
+      const normalized = String(raw ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
+      if (normalized === 'cancelled' || normalized === 'canceled') return { key: 'cancelled', label: 'Cancelled' };
+      if (normalized === 'parked') return { key: 'parked', label: 'Parked' };
+      return { key: '', label: '' };
+    }
+    function formatGroupBookingIcon(booking) {
+      if (!booking || (!String(booking.order_reference || '').trim() && (!Array.isArray(booking.group_members) || booking.group_members.length < 2))) return '';
+      return '<i class="fas fa-users group-booking-icon" title="Group booking" aria-label="Group booking"></i>';
+    }
+    function formatBookingStatusBadge(status) {
+      const statusInfo = normalizeBookingStatus(status);
+      if (!statusInfo.key) return '';
+      return `<span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded border text-[8px] font-bold align-middle status-${statusInfo.key}">${statusInfo.label}</span>`;
+    }
+    function formatGuestNameWithStatus(name, status) {
+      return `${escapeHtml(name || 'Guest')}${formatBookingStatusBadge(status)}`;
+    }
+    const compactHeaderLabel = value => {
+      const label = String(value ?? '').replace(/[_/]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+      const abbreviations = {
+        'booking reference': 'REF', 'booking ref': 'REF', 'check in date': 'ARRIVE', 'check-in date': 'ARRIVE',
+        'check out date': 'DEPART', 'check-out date': 'DEPART', 'total amount': 'TOTAL', 'total revenue': 'TOTAL',
+        'payment method': 'METHOD', 'transaction date': 'DATE', 'room unit name': 'ROOM', 'room unit revenue': 'REVENUE',
+        'guest name': 'GUEST', 'google sheets column': 'SHEET', 'mapping mode': 'MODE',
+        'postgresql field expression': 'FIELD', 'upsert key': 'KEY', 'other rev.': 'OTHER'
+      };
+      return abbreviations[label] || (label.split(' ')[0] || 'COLUMN').toUpperCase();
+    };
     const encodeBookingData = (booking) => encodeURIComponent(JSON.stringify(booking)).replace(/'/g, '%27');
     const depositBadge = (booking) => {
       const remaining = Math.max(0, parseFloat(booking.deposit_balance || 0));
@@ -639,6 +708,43 @@
       const room = String(value || '').trim();
       return room ? (room.toLowerCase().startsWith('room ') ? room : `Room ${room}`) : 'Room -';
     };
+
+    function updateLocalBookingState(ref, changes) {
+      const matches = booking => String(booking.booking_reference || '') === String(ref);
+      appState.bookings = appState.bookings.map(booking => matches(booking) ? { ...booking, ...changes } : booking);
+      appState.bookingsByDate.forEach((bookings, date) => {
+        const next = new Map(bookings);
+        next.forEach((booking, key) => { if (matches(booking)) next.set(key, { ...booking, ...changes }); });
+        appState.bookingsByDate.set(date, next);
+      });
+      appState.unpaidBookings = appState.unpaidBookings.map(booking => matches(booking) ? { ...booking, ...changes } : booking);
+      Object.keys(opsTableRecords).forEach(tableId => {
+        opsTableRecords[tableId] = (opsTableRecords[tableId] || []).map(booking => matches(booking) ? { ...booking, ...changes } : booking);
+      });
+    }
+
+    function renderActiveBookingViews() {
+      if (activeTab === 'ops') {
+        renderOpsTable('ops-arrivals-tbody', opsTableRecords['ops-arrivals-tbody'] || []);
+        renderOpsTable('ops-departures-tbody', opsTableRecords['ops-departures-tbody'] || []);
+        const arrivals = opsTableRecords['ops-arrivals-tbody'] || [];
+        const departures = opsTableRecords['ops-departures-tbody'] || [];
+        const visibleArrivals = arrivals.filter(booking => normalizeBookingStatus(booking).key !== 'cancelled');
+        const visibleDepartures = departures.filter(booking => normalizeBookingStatus(booking).key !== 'cancelled');
+        setElText('cliq-total-arrivals', visibleArrivals.length);
+        setElText('cliq-total-departures', visibleDepartures.length);
+        setElText('badge-arrivals-count', `${visibleArrivals.length} Guests`);
+        setElText('badge-departures-count', `${visibleDepartures.length} Guests`);
+      }
+      if (activeTab === 'unpaid') {
+        renderUnpaidRows(appState.unpaidBookings);
+        const visibleUnpaid = appState.unpaidBookings.filter(booking => normalizeBookingStatus(booking).key !== 'cancelled');
+        setElText('unpaid-summary-count', `${visibleUnpaid.length} Bookings`);
+        setElText('unpaid-summary-outstanding', fmt(visibleUnpaid.reduce((sum, booking) => sum + Number(booking.balance_due || 0), 0)));
+        setElText('unpaid-summary-booked', fmt(visibleUnpaid.reduce((sum, booking) => sum + Number(booking.booked_amount || 0), 0)));
+      }
+      if (activeTab === 'calendar') fetchCalendarGrid();
+    }
 
     class SmartTableFilter {
       constructor(table) {
@@ -669,6 +775,18 @@
 
       refresh() {
         this.rows = this.getRows();
+        if (!this.rows.length) {
+          this.applyFilters();
+          return;
+        }
+        this.states.forEach((allowed, columnIndex) => {
+          const available = new Set(this.getUniqueValues(columnIndex));
+          const previous = this.availableValues?.get(columnIndex) || new Set();
+          const wasAll = previous.size > 0 && previous.size === allowed.size && [...previous].every(value => allowed.has(value));
+          this.states.set(columnIndex, wasAll ? available : new Set([...allowed].filter(value => available.has(value))));
+          if (!this.availableValues) this.availableValues = new Map();
+          this.availableValues.set(columnIndex, available);
+        });
         this.applyFilters();
       }
 
@@ -707,6 +825,8 @@
         const current = this.states.get(columnIndex) || new Set(this.getUniqueValues(columnIndex));
         const values = this.getUniqueValues(columnIndex);
         this.states.set(columnIndex, new Set(current));
+        if (!this.availableValues) this.availableValues = new Map();
+        this.availableValues.set(columnIndex, new Set(values));
         dropdown.innerHTML = `<div class="flex items-center gap-1 pb-2 border-b border-gray-600"><button type="button" data-sort="asc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↑</span>Sort A to Z</button><button type="button" data-sort="desc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↓</span>Sort Z to A</button></div><div class="relative mt-2"><svg viewBox="0 0 20 20" fill="currentColor" class="absolute left-2 top-2 w-3 h-3 text-slate-400"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 1 0 3.48 9.76l3.63 3.63 1.06-1.06-3.63-3.63A5.5 5.5 0 0 0 8.5 3Zm0 1.5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" clip-rule="evenodd"/></svg><input data-search type="search" placeholder="Search values" class="w-full bg-gray-900 border border-gray-600 rounded px-7 py-1.5 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"></div><div class="flex items-center justify-between py-2 text-[10px]"><button type="button" data-select-all class="text-cyan-300 hover:text-cyan-200">Select all</button><button type="button" data-clear-all class="text-amber-300 hover:text-amber-200">Clear</button></div><div data-values class="max-h-48 overflow-y-auto border-y border-gray-700 py-1"></div><div class="flex items-center justify-end gap-2 pt-2"><button type="button" data-cancel class="px-3 py-1.5 text-[10px] rounded border border-gray-600 hover:bg-gray-700">Cancel</button><button type="button" data-ok class="px-3 py-1.5 text-[10px] rounded bg-amber-600 hover:bg-amber-500 font-semibold">OK</button></div>`;
         const valueBox = dropdown.querySelector('[data-values]');
         const renderValues = search => {
@@ -737,12 +857,16 @@
       }
     }
 
-    function initializeSmartFilters(tableElement) {
+    function applyUniversalColumnFilters(tableElement) {
       const table = typeof tableElement === 'string' ? document.querySelector(tableElement) : tableElement;
       if (!table) return null;
       if (!table._smartTableFilter) table._smartTableFilter = new SmartTableFilter(table);
       else table._smartTableFilter.refresh();
       return table._smartTableFilter;
+    }
+
+    function initializeSmartFilters(tableElement) {
+      return applyUniversalColumnFilters(tableElement);
     }
 
     document.addEventListener('click', event => {
@@ -841,7 +965,7 @@
       if (tab === 'calendar') fetchCalendarGrid();
       if (tab === 'ai-reports' && !currentAiReport.rows.length) runAiReport();
       if (tab === 'daily-tasks') loadTaskWorkspace();
-      if (tab === 'reconciliation') { runReconciliation(); loadMonthEndReconciliation(); }
+      if (tab === 'reconciliation') loadMonthEndReconciliation();
     }
 
     async function triggerFullSystemRefresh() {
@@ -855,7 +979,7 @@
         if (activeTab === 'calendar') await fetchCalendarGrid();
         if (activeTab === 'ai-reports') await runAiReport();
         if (activeTab === 'daily-tasks') await loadTaskWorkspace();
-        if (activeTab === 'reconciliation') await runReconciliation();
+        if (activeTab === 'reconciliation') await loadMonthEndReconciliation();
         const query = document.getElementById('global-booking-search')?.value.trim();
         if (query) await executeGlobalSearch(query); else closeSearchDropdown();
       } finally {
@@ -868,7 +992,7 @@
       const missingSheetBody = document.getElementById('reconciliation-missing-sheet-body');
       const missingSystem = currentReconciliation.missing_in_system || [];
       const missingSheet = currentReconciliation.missing_in_sheet || [];
-      missingSystemBody.innerHTML = missingSystem.length ? missingSystem.map(row => `<tr><td class="font-mono text-amber-300">${escapeHtml(row.booking_reference)}</td><td>${escapeHtml(row.check_in)}</td><td>${escapeHtml(row.guest_name || '-')}</td><td class="text-right"><button onclick="event.stopPropagation(); alert('Resolve/Flag integration is reserved for a future workflow.')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-[10px] text-amber-200">Resolve/Flag</button></td></tr>`).join('') : '<tr><td colspan="4" class="p-5 text-center text-emerald-300">No sheet-only discrepancies.</td></tr>';
+      missingSystemBody.innerHTML = missingSystem.length ? missingSystem.map(row => `<tr><td class="font-mono text-amber-300">${escapeHtml(row.booking_reference)}</td><td>${escapeHtml(row.check_in)}</td><td>${formatGuestNameWithStatus(row.guest_name || '-', row)}</td><td class="text-right"><button onclick="event.stopPropagation(); alert('Resolve/Flag integration is reserved for a future workflow.')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded text-[10px] text-amber-200">Resolve/Flag</button></td></tr>`).join('') : '<tr><td colspan="4" class="p-5 text-center text-emerald-300">No sheet-only discrepancies.</td></tr>';
       missingSheetBody.innerHTML = missingSheet.length ? missingSheet.map(row => {
         const encoded = encodeBookingData(row);
         const date = formatReconciliationPasteDate(row.check_in);
@@ -884,7 +1008,7 @@
           <td class="w-1 px-0 border-0 opacity-0"></td>
           <td class="truncate max-w-[250px]" title="${escapeHtml(row.booking_notes || row.notes || '')}">${escapeHtml(row.booking_notes || row.notes || '')}</td>
           <td class="truncate">${escapeHtml(row.guest_phone || '')}</td>
-          <td class="truncate">${escapeHtml(row.guest_name || '')}</td>
+          <td class="truncate">${formatGuestNameWithStatus(row.guest_name || '', row)}</td>
           <td>${escapeHtml(row.number_of_guests ?? '')}</td>
           <td>${escapeHtml(row.nights ?? '')}</td>
           <td class="truncate">${escapeHtml(row.booking_source || '')}</td>
@@ -898,7 +1022,7 @@
           <td class="truncate">${escapeHtml(row.guest_email || '')}</td>
         </tr>`;
       }).join('') : '<tr><td colspan="20" class="p-5 text-center text-emerald-300">No system-only discrepancies.</td></tr>';
-      initializeSmartFilters('#reconciliation-missing-sheet-table');
+      applyUniversalColumnFilters('#reconciliation-missing-sheet-table');
     }
 
     function formatReconciliationPasteDate(value) {
@@ -1041,8 +1165,9 @@
         const booking = { booking_reference: transaction.booking_reference || '', room_unit_name: transaction.room_name || '', guest_name: transaction.guest_name || '' };
         const encoded = encodeBookingData(booking);
         const date = transaction.received_date_time ? String(transaction.received_date_time).slice(0, 10) : '-';
-        return `<tr class="cursor-pointer border-b border-slate-800 hover:bg-slate-800/70 transition" onclick="openUniversalModal('${encoded}')" title="Open booking card"><td>${escapeHtml(date)}</td><td class="font-mono text-emerald-300">${escapeHtml(transaction.booking_reference || '-')}</td><td>${escapeHtml(transaction.room_name || '-')}</td><td>${escapeHtml(transaction.guest_name || '-')}</td><td class="text-cyan-300">${escapeHtml(transaction.payment_method || '-')}</td><td class="text-right text-emerald-300 font-semibold">${fmt(transaction.amount)}</td></tr>`;
+        return `<tr class="cursor-pointer border-b border-slate-800 hover:bg-slate-800/70 transition" onclick="openUniversalModal('${encoded}')" title="Open booking card"><td>${escapeHtml(date)}</td><td class="font-mono text-emerald-300">${escapeHtml(transaction.booking_reference || '-')}</td><td>${escapeHtml(transaction.room_name || '-')}</td><td>${formatGuestNameWithStatus(transaction.guest_name || '-', transaction)}</td><td class="text-cyan-300">${escapeHtml(transaction.payment_method || '-')}</td><td class="text-right text-emerald-300 font-semibold">${fmt(transaction.amount)}</td></tr>`;
       }).join('') : '<tr><td colspan="6" class="p-5 text-center text-slate-500">No cash transactions found for this property and month.</td></tr>';
+      applyUniversalColumnFilters('#cash-ledger-table');
     }
 
     function setMonthEndLocked(settlement) {
@@ -1051,13 +1176,14 @@
       expenseForm?.querySelectorAll('input, button, textarea, select').forEach(element => { element.disabled = locked; });
       document.querySelectorAll('[data-expense-action]').forEach(element => { element.disabled = locked; });
       ['settlement-manager', 'actual-cash-in-hand', 'lock-month-btn'].forEach(id => { const element = document.getElementById(id); if (element) element.disabled = locked; });
+      document.getElementById('unlock-month-btn')?.classList.toggle('hidden', !locked);
       const badge = document.getElementById('month-lock-badge');
       if (badge) badge.classList.toggle('hidden', !locked);
       if (locked) {
         document.getElementById('settlement-manager').value = settlement.manager_name || '';
         document.getElementById('actual-cash-in-hand').value = Number(settlement.actual_cash_in_hand || 0).toFixed(2);
         setElText('settlement-status', `Sealed on ${new Date(settlement.locked_at).toLocaleString()}.`);
-      }
+      } else if (settlement) setElText('settlement-status', 'Month is open for editing.');
     }
 
     function updateSettlementVariance() {
@@ -1082,12 +1208,15 @@
         if (!ledgerResponse.ok) throw new Error(ledgerResult.error || 'Unable to load cash ledger.');
         setElText('month-expected-cash', fmt(result.expected_cash));
         setElText('month-total-expenses', fmt(result.total_expenses));
+        setElText('reconciliation-briefing', `For ${month}, ${property} processed ${fmt(result.expected_cash)} in cash and recorded ${fmt(result.total_expenses)} in expenses, leaving ${fmt(result.adjusted_expected)} expected cash.`);
         const adjusted = document.getElementById('month-adjusted-expected');
         adjusted.dataset.value = result.adjusted_expected;
         adjusted.textContent = fmt(result.adjusted_expected);
         renderMonthEndExpenses(result.expenses || []);
         renderCashLedger(ledgerResult.transactions || []);
         const settlement = result.settlements?.[0];
+        const periodState = settlement?.is_locked ? 'Sealed' : 'Open';
+        setElText('smart-brief-container', `Executive Summary: In ${month}, ${property} collected ${fmt(result.expected_cash)} in cash payments. With ${fmt(result.total_expenses)} recorded in expenses, the expected vault balance is ${fmt(result.adjusted_expected)}. The period is currently ${periodState}.`);
         setMonthEndLocked(settlement);
         if (!settlement) {
           document.getElementById('settlement-manager').value = '';
@@ -1113,6 +1242,17 @@
       form.reset();
       document.getElementById('expense-date').value = `${monthEndValues().month}-01`;
       setElText('expense-status', 'Expense saved.');
+      await loadMonthEndReconciliation();
+    }
+
+    async function unlockSettlementMonth() {
+      const { property, month } = monthEndValues();
+      if (!property || property === 'ALL' || !month) return setElText('settlement-status', 'Select a property and month first.');
+      if (!window.confirm('Unlock this month for editing?')) return;
+      const response = await fetch('/api/settlements/unlock', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ property, month }) });
+      const result = await response.json();
+      if (!response.ok) return setElText('settlement-status', result.error || 'Unable to unlock month.');
+      setElText('settlement-status', 'Month unlocked for editing.');
       await loadMonthEndReconciliation();
     }
 
@@ -1310,7 +1450,6 @@
     // =======================================================================
     function closeUniversalPanel(ref) {
       document.getElementById(`panel-${ref}`)?.remove();
-      if (activeTab === 'reconciliation') triggerFullSystemRefresh();
     }
 
     function closeUniversalPanels() {
@@ -1320,19 +1459,24 @@
       if (activeTab === 'reconciliation') triggerFullSystemRefresh();
     }
 
+    function applyBookingStatusState(header, status) {
+      if (!header) return;
+      const statusInfo = normalizeBookingStatus(status);
+      header.classList.remove('booking-modal-header-cancelled', 'booking-modal-header-noshow', 'bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
+      header.classList.add('bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
+      if (statusInfo.key === 'cancelled') header.classList.add('booking-modal-header-cancelled');
+      if (statusInfo.key === 'noshow') header.classList.add('booking-modal-header-noshow');
+    }
+
     async function openUniversalModal(encodedData) {
       const seedBooking = JSON.parse(decodeURIComponent(encodedData));
-      let b = seedBooking;
-      try {
-        const response = await fetch(`/api/bookings/${encodeURIComponent(seedBooking.booking_reference)}`);
-        if (response.ok) b = { ...seedBooking, ...(await response.json()) };
-      } catch (error) {
-        console.warn('Unable to load authoritative booking details:', error.message);
-      }
+      const cachedBooking = appState.bookings.find(booking => String(booking.booking_reference || '') === String(seedBooking.booking_reference || ''))
+        || appState.unpaidBookings.find(booking => String(booking.booking_reference || '') === String(seedBooking.booking_reference || ''));
+      const b = cachedBooking ? { ...seedBooking, ...cachedBooking } : seedBooking;
       const ref = b.booking_reference;
       const bookingNotes = b.notes ?? b.booking_notes ?? b.custom_notes ?? '';
-      const bookingStatus = String(b.booking_status || 'Confirmed').trim() || 'Confirmed';
-      const isCanceled = ['canceled', 'cancelled'].includes(bookingStatus.toLowerCase());
+      const bookingStatus = String(b.booking_status || b.status || 'Confirmed').trim() || 'Confirmed';
+      const bookingStatusInfo = normalizeBookingStatus(bookingStatus);
       const rawData = b.raw_data && typeof b.raw_data === 'object' ? b.raw_data : {};
       const guestFirstName = b.guest_first_name || b.guest_first || (b.guest_name || '').split(' ')[0] || 'Guest';
       const guestLastName = b.guest_last_name || b.guest_last || (b.guest_name || '').split(' ').slice(1).join(' ');
@@ -1353,13 +1497,15 @@
       
       // Calculate Stats
       let chargesSum = parseFloat(b.total_charges || 0);
-      const recordedPayments = parseFloat(b.total_paid_amount || 0);
+      const paymentHistory = Array.isArray(b.payment_history) ? b.payment_history : [];
+      bookingCardPaymentState.set(ref, paymentHistory);
       const roomUnitRevenue = [b.room_unit_revenue, rawData['Room/Unit Revenue'], rawData['room_unit_revenue'], rawData.room_rate, rawData['Room Rate']]
         .map(value => parseFloat(value))
         .find(Number.isFinite);
-      const totalBilled = parseFloat(b.net_total ?? (Number.isFinite(roomUnitRevenue) ? roomUnitRevenue : parseFloat(b.booked_amount || 0)));
+      const totalBilled = cleanPaymentAmount(b.net_total ?? (Number.isFinite(roomUnitRevenue) ? roomUnitRevenue : b.booked_amount || 0));
+      bookingCardTotalState.set(ref, totalBilled);
       const otherRevenue = parseFloat(b.other_revenue ?? rawData['Other Revenue'] ?? rawData.other_revenue ?? 0) || 0;
-      const paymentsSum = Math.min(recordedPayments, totalBilled);
+      const paymentsSum = paymentHistory.filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true').reduce((sum, payment) => sum + cleanPaymentAmount(payment?.amount), 0);
       let balance = totalBilled - paymentsSum;
       const groupMembers = Array.isArray(b.group_members) ? b.group_members : [];
       const groupHeaderHtml = groupMembers.length > 1 ? `
@@ -1375,7 +1521,9 @@
             <div class="absolute right-0 z-30 mt-1 w-72 rounded-lg border border-slate-600 bg-slate-900 p-1 shadow-xl">
               ${groupMembers.map(member => {
                 const memberName = [member.guest_first_name, member.guest_last_name].filter(Boolean).join(' ') || member.guest_name || 'Guest';
-                return `<button type="button" onclick="openUniversalModal('${encodeBookingData(member)}')" class="block w-full rounded px-2 py-2 text-left hover:bg-slate-800"><span class="block text-[10px] font-bold text-white">${escapeHtml(member.booking_reference)} ${escapeHtml(memberName)}</span><span class="block text-[9px] text-slate-400">${Number(member.adults || 0)} Adult, ${escapeHtml(member.room_unit_name || '-')}</span></button>`;
+                const memberStatusInfo = normalizeBookingStatus(member);
+                const memberSuffix = memberStatusInfo.label ? ` (${memberStatusInfo.label})` : '';
+                return `<button type="button" onclick="openUniversalModal('${encodeBookingData(member)}')" class="block w-full rounded px-2 py-2 text-left hover:bg-slate-800"><span class="block text-[10px] font-bold ${memberStatusInfo.key === 'cancelled' ? 'text-rose-300' : memberStatusInfo.key === 'noshow' ? 'text-orange-300' : 'text-white'}">${escapeHtml(member.booking_reference)} ${escapeHtml(memberName)}${memberSuffix}</span><span class="block text-[9px] text-slate-400">${Number(member.adults || 0)} Adult, ${escapeHtml(member.room_unit_name || '-')}</span></button>`;
               }).join('')}
             </div>
           </details>
@@ -1385,18 +1533,29 @@
       const remainingDeposit = Math.max(0, otherRevenue - waivedDeposit);
       const depositNotice = otherRevenue > 0 ? `<div class="flex items-start gap-2 rounded border border-rose-300 bg-rose-100 px-3 py-2 text-xs text-slate-900 shadow-sm"><i class="fa-solid fa-circle-info text-lg"></i><div><div>Damage deposit outstanding: <strong>${fmt(remainingDeposit)}</strong> <button type="button" class="text-cyan-700 underline" onclick="waivePanelDeposit('${ref}', ${remainingDeposit.toFixed(2)})" ${remainingDeposit <= 0 ? 'disabled' : ''}>${remainingDeposit > 0 ? 'Waive' : 'Waived'}</button></div>${waivedDeposit > 0 ? `<div class="mt-1">${fmt(waivedDeposit)} waived</div>` : ''}</div></div>` : '';
 
+      const formatPaymentAuditDate = value => {
+        const raw = String(value || '').trim();
+        if (!raw) return 'Unknown';
+        const date = new Date(raw.replace(' ', 'T'));
+        if (Number.isNaN(date.getTime())) return raw;
+        const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const pad = number => String(number).padStart(2, '0');
+        return `${weekdays[date.getDay()]} ${pad(date.getDate())} ${months[date.getMonth()]} ${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+      };
+      const auditTitle = p => `User: ${p.user_name || 'Unknown'} | Last Updated: ${formatPaymentAuditDate(p.last_updated_date_time)}`;
       let historyHtml = '';
       if(b.payment_history && b.payment_history.length > 0) {
         b.payment_history.forEach(p => {
           const amt = parseFloat(p.amount);
           const isCharge = amt < 0;
           historyHtml += `
-            <tr class="hover:bg-slate-800/60 border-b border-slate-800/50 transition">
+            <tr data-payment-key="${escapeHtml(String(p.unique_payment_key || p.ledger_id || ''))}" class="hover:bg-slate-800/60 border-b border-slate-800/50 transition" title="${escapeHtml(auditTitle(p))}">
               <td class="p-2 font-mono text-[10px] text-slate-400">${p.payment_date ? p.payment_date.split('T')[0] : ''}</td>
               <td class="p-2 font-bold ${isCharge ? 'text-rose-300' : 'text-emerald-300'}">${p.payment_method || 'Payment'}</td>
               <td class="p-2 text-slate-400 max-w-[180px]" title="${p.description || ''}">${p.description || 'Record'}</td>
               <td class="p-2 text-right font-bold ${isCharge ? 'text-rose-300' : 'text-emerald-300'}">${amt < 0 ? '-' : '+'}${fmt(Math.abs(amt))}</td>
-              <td class="p-2 text-center">${p.source === 'manual' ? `<button onclick="removePaymentRecord('${ref}', ${p.payment_id})" class="text-slate-500 hover:text-rose-300 transition" title="Remove manual record"><i class="fa-solid fa-trash-can"></i></button>` : '<span class="text-[9px] text-slate-600">Imported</span>'}</td>
+              <td class="p-2 text-center"><button onclick="event.stopPropagation(); editPaymentRecord('${ref}', '${p.source}', ${p.source === 'manual' ? p.payment_id : p.imported_id}, ${Number(p.amount || 0)}, '${encodeURIComponent(p.payment_method || '')}', '${encodeURIComponent(p.description || '')}');" class="text-slate-500 hover:text-amber-300 transition mr-2" title="Edit payment"><i class="fa-solid fa-pen"></i></button><button onclick="event.stopPropagation(); removePaymentRecord('${ref}', '${p.source}', ${p.source === 'manual' ? p.payment_id : p.imported_id})" class="text-slate-500 hover:text-rose-300 transition" title="Delete payment"><i class="fa-solid fa-trash-can"></i></button></td>
             </tr>`;
         });
       } else {
@@ -1410,8 +1569,8 @@
       const commsHtml = messageHistory.length ? messageHistory.map(message => `<div class="p-3 border-b border-slate-800"><div class="flex justify-between text-[10px] text-slate-500"><span>${message.message_type}</span><span>${message.created_at ? message.created_at.split('T')[0] : ''}</span></div><div class="text-xs text-slate-200 mt-1">${message.message_text}</div><button onclick="removePanelMessage('${ref}', ${message.message_id})" class="text-[10px] text-rose-300 mt-2">Delete</button></div>`).join('') : '<div class="text-center text-slate-500 py-6">No communications recorded.</div>';
 
       panel.innerHTML = `
-        <div class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-between items-start w-full gap-4 shrink-0">
-          <div class="min-w-0 flex flex-col flex-1"><h2 class="text-sm font-bold text-white truncate max-w-[200px]">${b.room_unit_name || 'Room'}</h2><div class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i class="fa-solid fa-hotel text-indigo-400"></i><span class="truncate">${b.property_name || 'Hotel'}</span></div></div>
+        <div data-booking-modal-header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-between items-start w-full gap-4 shrink-0">
+          <div class="min-w-0 flex flex-col flex-1"><h2 class="text-sm font-bold text-white truncate max-w-[200px]">${escapeHtml(b.room_unit_name || 'Room')}${bookingStatusInfo.label ? ` (${bookingStatusInfo.label})` : ''}</h2><div class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i class="fa-solid fa-hotel text-indigo-400"></i><span class="truncate">${escapeHtml(b.property_name || 'Hotel')}</span></div></div>
           <div class="flex flex-col items-end gap-2 shrink-0"><div class="max-w-[250px] truncate">${guestTag ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[9px] font-bold max-w-[250px] truncate">${escapeHtml(guestTag)}<i class="fa-solid fa-xmark text-[8px] shrink-0"></i></span>` : ''}</div><div class="flex items-center gap-2">${groupHeaderHtml}<button onclick="closeUniversalPanel('${ref}')" class="text-slate-400 hover:text-white text-xl transition" aria-label="Close booking"><i class="fa-solid fa-xmark"></i></button></div></div>
         </div>
 
@@ -1428,10 +1587,10 @@
         <div class="p-4 overflow-y-auto flex-1 text-sm text-slate-700 dark:text-slate-300 w-full relative min-h-0">
           <!-- SUMMARY TAB -->
           <div id="tab-summary-${ref}" class="space-y-4 h-full">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-2"><div class="rounded-lg bg-slate-950 border border-slate-800 p-3"><div class="text-[9px] text-slate-500 uppercase">Total</div><div class="text-xl font-black text-white mt-1">${fmt(totalBilled)}</div></div><div class="rounded-lg bg-emerald-950/30 border border-emerald-500/20 p-3"><div class="text-[9px] text-emerald-400 uppercase">Paid</div><div class="text-xl font-black text-emerald-300 mt-1">${fmt(paymentsSum)}</div></div><div class="rounded-lg bg-amber-400/20 border border-amber-400/40 p-3"><div class="text-[9px] text-amber-300 uppercase">Balance</div><div class="text-xl font-black text-amber-200 mt-1">${fmt(Math.max(0, balance))}</div></div><div class="rounded-lg bg-rose-500/20 border border-rose-400/40 p-3"><div class="text-[9px] text-rose-300 uppercase">Due Now</div><div class="text-xl font-black text-rose-200 mt-1">${fmt(Math.max(0, balance))}</div></div></div>${depositNotice}
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2"><div class="rounded-lg bg-slate-950 border border-slate-800 p-3"><div class="text-[9px] text-slate-500 uppercase">Total</div><div class="text-xl font-black text-white mt-1">${fmt(totalBilled)}</div></div><div class="rounded-lg bg-emerald-950/30 border border-emerald-500/20 p-3"><div class="text-[9px] text-emerald-400 uppercase">Paid</div><div id="booking-paid-${ref}" class="text-xl font-black text-emerald-300 mt-1">£${paymentsSum.toFixed(2)}</div></div><div class="rounded-lg bg-amber-400/20 border border-amber-400/40 p-3"><div class="text-[9px] text-amber-300 uppercase">Balance</div><div id="booking-balance-${ref}" class="text-xl font-black text-amber-200 mt-1">£${balance.toFixed(2)}</div></div><div class="rounded-lg bg-rose-500/20 border border-rose-400/40 p-3"><div class="text-[9px] text-rose-300 uppercase">Due Now</div><div id="booking-due-${ref}" class="text-xl font-black text-rose-200 mt-1">£${Math.max(0, balance).toFixed(2)}</div></div></div>${depositNotice}
             <div class="flex items-center justify-between gap-3 text-xs"><div class="flex items-center gap-3"><button class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-slate-700 dark:text-slate-300 shadow-sm"><i class="fa-regular fa-clock mr-1"></i>Not Known</button><span class="text-slate-700 dark:text-slate-300"><i class="fa-solid fa-phone mr-1 text-slate-500"></i>${guestPhone || '-'}</span></div><span class="rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 text-slate-700 dark:text-slate-300">${checkInStatus}</span></div>
             <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 shadow-sm"><div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs"><div class="space-y-2"><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Check-in</span><div class="font-semibold text-slate-900 dark:text-white">${b.check_in || '-'}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Check Out</span><div class="font-semibold text-slate-900 dark:text-white">${b.check_out || '-'}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Nights</span><div class="font-semibold text-slate-900 dark:text-white">${b.nights || 0}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Source / Channel</span><div class="font-semibold text-cyan-600 dark:text-cyan-300">${b.channel || 'Direct'}</div></div></div><div class="flex flex-col items-center justify-center border-y md:border-y-0 md:border-x border-slate-200 dark:border-slate-700 py-3"><i class="fa-solid fa-people-group text-2xl text-indigo-500 dark:text-indigo-300"></i><span class="mt-2">${b.adults || 0} Adults</span><span>${b.children || 0} Children</span></div><div class="space-y-2"><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Order</span><div class="font-mono text-cyan-600 dark:text-cyan-300 break-all">${b.order_reference || '-'}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Received</span><div class="text-slate-900 dark:text-white">${b.booking_date || '-'}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-slate-400">Cancellation</span><div class="text-slate-900 dark:text-white">${fmt(cancellationRevenue)}</div></div><div><span class="text-[9px] uppercase text-slate-500 dark:text-white">Deposit</span><div class="text-slate-900 dark:text-white">£-</div></div></div></div></div>
-            <div class="rounded-xl border border-slate-800 overflow-x-auto"><table class="w-full text-left text-[11px]"><thead class="bg-slate-950 text-[9px] uppercase text-slate-500"><tr><th class="p-2">Property</th><th class="p-2">Room/Unit Name</th><th class="p-2">Rate Plan</th><th class="p-2">Beds</th><th class="p-2 text-right">Room/Unit Revenue</th></tr></thead><tbody><tr class="border-t border-slate-800"><td class="p-2">${b.property_name || '-'}</td><td class="p-2">${b.room_unit_name || '-'}</td><td class="p-2">${ratePlan}</td><td class="p-2">${beds}</td><td class="p-2 text-right font-semibold">${fmt(totalBilled)}</td></tr></tbody></table></div>
+            <div class="rounded-xl border border-slate-800 overflow-x-auto"><table class="w-full text-left text-[11px]"><thead class="bg-slate-950 text-[9px] uppercase text-slate-500"><tr><th class="p-2">PROPERTY</th><th class="p-2">ROOM</th><th class="p-2">RATE</th><th class="p-2">BEDS</th><th class="p-2 text-right">REVENUE</th></tr></thead><tbody><tr class="border-t border-slate-800"><td class="p-2">${b.property_name || '-'}</td><td class="p-2">${b.room_unit_name || '-'}</td><td class="p-2">${ratePlan}</td><td class="p-2">${beds}</td><td class="p-2 text-right font-semibold">${fmt(totalBilled)}</td></tr></tbody></table></div>
             <div class="rounded-xl border border-amber-300 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-950/20 p-4"><div class="flex items-center justify-between gap-2"><div class="flex gap-3 text-[10px] font-bold"><button class="border-b-2 border-amber-500 pb-1 text-amber-700 dark:text-amber-200">Booking Notes</button><button class="text-slate-500 dark:text-slate-400 pb-1">Cleaning Instructions</button></div><button onclick="savePanelGuestDetails('${ref}')" class="bg-yellow-400 text-slate-900 font-medium hover:bg-yellow-500 transition-colors rounded px-2 py-1 text-[10px]">Save</button></div><textarea id="notes-${ref}" data-panel-editable="${ref}" rows="4" class="mt-3 w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg px-2 py-1.5 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-400 focus:outline-none shadow-sm text-xs" placeholder="Add booking notes..."></textarea></div>
           </div>
 
@@ -1440,7 +1599,8 @@
 
           <!-- GUEST TAB -->
           <div id="tab-guest-${ref}" class="hidden space-y-3 flex flex-col h-full">
-            <div class="hidden" aria-hidden="true"><input id="name-${ref}" value="${guestFirstName} ${guestLastName}"><input id="chan-${ref}" value="${b.channel || 'Direct'}"><select id="prop-${ref}"><option value="${b.property_name || ''}" selected>${b.property_name || ''}</option></select><select id="room-${ref}"><option value="${b.room_unit_name || ''}" selected>${b.room_unit_name || ''}</option></select><input id="checkin-${ref}" value="${b.check_in || ''}"><input id="checkout-${ref}" value="${b.check_out || ''}"><input id="roomtype-${ref}" value="${b.room_unit_type || ''}"><input id="status-${ref}" value="${bookingStatus}"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 rounded-lg border border-indigo-500/30 bg-indigo-950/20 p-3 text-[10px]"><div><label class="block text-slate-400 mb-1">Property / Hotel</label><select id="prop-${ref}" onchange="populatePanelRooms('${ref}')" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><option value="${escapeHtml(b.property_name || '')}" selected>${escapeHtml(b.property_name || '')}</option></select></div><div><label class="block text-slate-400 mb-1">Room / Unit</label><select id="room-${ref}" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><option value="${escapeHtml(b.room_unit_name || '')}" selected>${escapeHtml(b.room_unit_name || '')}</option></select></div><div><label class="block text-slate-400 mb-1">Total Amount (£)</label><input id="total-${ref}" type="number" min="0" step="0.01" value="${Number(b.booked_amount ?? b.total_revenue ?? 0).toFixed(2)}" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"></div><div class="flex items-end justify-end"><button onclick="savePanelBookingCore('${ref}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-[10px] font-bold"><i class="fa-solid fa-floppy-disk mr-1"></i>Save Booking Details</button></div></div>
+            <div class="hidden" aria-hidden="true"><input id="name-${ref}" value="${guestFirstName} ${guestLastName}"><input id="chan-${ref}" value="${b.channel || 'Direct'}"><input id="checkin-${ref}" value="${b.check_in || ''}"><input id="checkout-${ref}" value="${b.check_out || ''}"><input id="roomtype-${ref}" value="${b.room_unit_type || ''}"><input id="status-${ref}" value="${bookingStatus}"></div>
             <div class="flex flex-wrap items-center gap-4 text-xs"><select class="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:ring-2 focus:ring-slate-400 focus:outline-none shadow-sm rounded-lg px-3 py-2"><option>Guest</option></select><label class="flex items-center gap-2 text-slate-700 dark:text-slate-300"><input type="checkbox" class="accent-amber-400"> Billing contact</label><label class="flex items-center gap-2 text-slate-700 dark:text-slate-300"><input type="checkbox" checked class="accent-amber-400"> Staying with us</label></div>
             <input type="search" placeholder="Replace with existing contact" class="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white placeholder-slate-500 focus:ring-2 focus:ring-slate-400 focus:outline-none shadow-sm rounded-lg px-3 py-2 text-xs">
             <div class="flex gap-4 border-b border-slate-200 dark:border-slate-700 text-xs"><button class="border-b-2 border-amber-500 px-2 py-2 text-amber-700 dark:text-amber-300 font-semibold">Profile</button><button class="px-2 py-2 text-slate-500 dark:text-slate-400">Regulatory</button><button class="px-2 py-2 text-slate-500 dark:text-slate-400">Custom Fields</button></div>
@@ -1451,13 +1611,13 @@
 
           <!-- FINANCE TAB -->
           <!-- CHARGES TAB -->
-          <div id="tab-charges-${ref}" class="hidden space-y-3 h-full min-h-0"><div class="flex items-center justify-between"><div><div class="text-[10px] uppercase font-bold text-amber-300">Charges and deductions</div><div class="text-xs text-slate-500 mt-1">Add revenue items such as damage deposits or breakfast.</div></div></div><div class="border border-slate-800 rounded-lg overflow-hidden flex-1 min-h-[180px]"><table class="w-full text-left text-[11px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase"><tr><th class="p-2">Date</th><th class="p-2">Category</th><th class="p-2">Description</th><th class="p-2 text-right">Amount</th><th class="p-2"></th></tr></thead><tbody class="divide-y divide-slate-800">${chargesHtml}</tbody></table></div><div class="border border-slate-700 bg-slate-900 rounded-lg p-3"><div class="grid grid-cols-3 gap-2 text-[10px]"><input id="charge-category-${ref}" value="Ad Hoc" placeholder="Category" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><input id="charge-description-${ref}" placeholder="Description" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><input id="charge-amount-${ref}" type="number" min="0.01" step="0.01" placeholder="Amount" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"></div><button onclick="addPanelCharge('${ref}')" class="mt-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold">Add Charge</button></div></div>
+          <div id="tab-charges-${ref}" class="hidden space-y-3 h-full min-h-0"><div class="flex items-center justify-between"><div><div class="text-[10px] uppercase font-bold text-amber-300">Charges and deductions</div><div class="text-xs text-slate-500 mt-1">Add revenue items such as damage deposits or breakfast.</div></div></div><div class="border border-slate-800 rounded-lg overflow-hidden flex-1 min-h-[180px]"><table class="w-full text-left text-[11px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase"><tr><th class="p-2">DATE</th><th class="p-2">CATEGORY</th><th class="p-2">DESC</th><th class="p-2 text-right">AMOUNT</th><th class="p-2"></th></tr></thead><tbody class="divide-y divide-slate-800">${chargesHtml}</tbody></table></div><div class="border border-slate-700 bg-slate-900 rounded-lg p-3"><div class="grid grid-cols-3 gap-2 text-[10px]"><input id="charge-category-${ref}" value="Ad Hoc" placeholder="Category" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><input id="charge-description-${ref}" placeholder="Description" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"><input id="charge-amount-${ref}" type="number" min="0.01" step="0.01" placeholder="Amount" class="bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-white"></div><button onclick="addPanelCharge('${ref}')" class="mt-2 px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white rounded text-[10px] font-bold">Add Charge</button></div></div>
 
           <!-- PAYMENTS TAB -->
           <div id="tab-payments-${ref}" class="hidden space-y-3 flex flex-col h-full min-h-0">
             <div class="bg-slate-950/50 border border-slate-800 rounded-lg overflow-hidden w-full flex-1 flex flex-col min-h-[220px]">
               <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between"><span class="font-bold text-[10px] text-slate-200 uppercase tracking-wide"><i class="fa-solid fa-list-check mr-1 text-indigo-400"></i> Complete payment ledger</span><span class="text-[9px] text-slate-500">Imported records are read-only</span></div>
-              <div class="overflow-y-auto overflow-x-auto flex-1 h-full"><table class="w-full text-left text-[11px] min-w-[560px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase sticky top-0 z-10"><tr><th class="p-2">Date</th><th class="p-2">Payment method</th><th class="p-2">Description / source note</th><th class="p-2 text-right">Amount</th><th class="p-2 text-center">Audit</th></tr></thead><tbody class="divide-y divide-slate-800 text-slate-300">${historyHtml}</tbody></table></div>
+              <div class="overflow-y-auto overflow-x-auto flex-1 h-full"><table class="w-full text-left text-[11px] min-w-[560px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase sticky top-0 z-10"><tr><th class="p-2">DATE</th><th class="p-2">METHOD</th><th class="p-2">DESC</th><th class="p-2 text-right">AMOUNT</th><th class="p-2 text-center">AUDIT</th></tr></thead><tbody class="divide-y divide-slate-800 text-slate-300">${historyHtml}</tbody></table></div>
             </div>
             <div class="border border-slate-700 bg-slate-900 rounded-lg p-3 w-full shrink-0">
               <div class="font-bold text-[10px] text-emerald-400 mb-2 uppercase"><i class="fa-solid fa-plus-circle mr-1"></i> New Record</div>
@@ -1492,8 +1652,8 @@
                 <div><h1 class="text-lg font-black text-slate-800">Eviivo Hotel</h1><p class="text-[10px] text-slate-500">Folio Statement</p></div>
                 <div class="text-right"><div class="text-xs font-mono font-bold text-slate-800">INV-${ref}</div><div class="text-[9px] text-slate-500">${new Date().toISOString().split('T')[0]}</div></div>
               </div>
-              <div class="text-[10px] mb-3 leading-relaxed"><b>Billed To:</b> ${b.guest_name} ${b.company_name ? '<br>'+b.company_name : ''} ${b.company_vat ? '<br>VAT: '+b.company_vat : ''}<br><span class="text-slate-500">Company Address: [To be provided]</span><br><span class="text-slate-500">VAT Number: ${b.company_vat || '[To be provided]'}</span></div>
-              <table class="w-full text-[10px] text-left mb-4 border-collapse"><thead class="border-b border-slate-300 text-slate-500"><tr><th class="pb-1">Desc</th><th class="pb-1 text-right">Amount (£)</th></tr></thead>
+              <div class="text-[10px] mb-3 leading-relaxed"><b>Billed To:</b> ${formatGuestNameWithStatus(b.guest_name, b)} ${b.company_name ? '<br>'+b.company_name : ''} ${b.company_vat ? '<br>VAT: '+b.company_vat : ''}<br><span class="text-slate-500">Company Address: [To be provided]</span><br><span class="text-slate-500">VAT Number: ${b.company_vat || '[To be provided]'}</span></div>
+              <table class="w-full text-[10px] text-left mb-4 border-collapse"><thead class="border-b border-slate-300 text-slate-500"><tr><th class="pb-1">DESC</th><th class="pb-1 text-right">AMOUNT</th></tr></thead>
               <tbody><tr><td class="py-1 font-bold">Room Rate</td><td class="py-1 text-right font-bold">${fmt(totalBilled)}</td></tr></tbody></table>
               <div class="mt-auto border-t-2 border-slate-200 pt-3 flex justify-end text-[11px]"><div class="w-52"><div class="flex justify-between mb-1"><span>Total Billed:</span><b>${fmt(totalBilled)}</b></div><div class="flex justify-between text-emerald-600 mb-1 border-b pb-1"><span>Total Paid:</span><b>${fmt(paymentsSum)}</b></div><div class="flex justify-between font-black text-slate-900 text-sm"><span>Balance Due:</span><span>${fmt(balance)}</span></div></div></div>
               <div class="border-t border-slate-200 mt-8 pt-3 text-[9px] text-slate-400 flex justify-between"><span>Company Address: [To be provided]</span><span>VAT Number: ${b.company_vat || '[To be provided]'}</span></div>
@@ -1505,7 +1665,9 @@
         </div>
         <div id="footer-${ref}" class="border-t border-slate-800 bg-slate-950/90 px-4 py-3 flex items-center justify-between gap-3 shrink-0"></div>
       `;
+      applyBookingStatusState(panel.querySelector('[data-booking-modal-header]'), bookingStatus);
       container.prepend(panel); // Prepend so newest opens on the left of existing
+      updateBookingCardSummary(totalBilled, bookingCardPaymentState.get(ref), ref);
       document.getElementById(`notes-${ref}`).value = bookingNotes;
       renderPanelFooter(ref, 'summary');
 
@@ -1572,13 +1734,33 @@
       if(meth === 'External Card Reader') sec.classList.remove('hidden'); else sec.classList.add('hidden');
     }
 
-    async function completeModalMutation(ref, response, fallbackMessage = 'Unable to complete booking action.') {
+    async function refreshGlobalState(ref) {
+      closeUniversalPanel(ref);
+      renderActiveBookingViews();
+    }
+
+    async function completeModalMutation(ref, response, fallbackMessage = 'Unable to complete booking action.', optimisticUpdate = null) {
       let result = {};
       try { result = await response.json(); } catch (error) { result = {}; }
       if (!response.ok) throw new Error(result.error || fallbackMessage);
-      document.getElementById(`panel-${ref}`)?.remove();
-      await triggerFullSystemRefresh();
+      if (typeof optimisticUpdate === 'function') {
+        optimisticUpdate(result);
+        refreshLocalBookingPaymentSummary(ref);
+      }
+      closeUniversalPanel(ref);
+      renderActiveBookingViews();
       return result;
+    }
+
+    async function savePanelBookingCore(ref) {
+      const total = Number(document.getElementById(`total-${ref}`)?.value);
+      const property = document.getElementById(`prop-${ref}`)?.value.trim();
+      const room = document.getElementById(`room-${ref}`)?.value.trim();
+      if (!Number.isFinite(total) || total < 0 || !property || !room) return alert('Enter a valid total, property, and room.');
+      try {
+        const response = await fetch(`/api/bookings/${encodeURIComponent(ref)}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ total_amount: total, property_name: property, room_name: room }) });
+        await completeModalMutation(ref, response, 'Unable to save booking details.', () => updateLocalBookingState(ref, { total_revenue: total, booked_amount: total, property_name: property, room_unit_name: room }));
+      } catch (error) { alert(`Error: ${error.message}`); }
     }
 
     async function savePanelGuestDetails(ref) {
@@ -1604,7 +1786,15 @@
             notes: document.getElementById(`notes-${ref}`).value
           })
         });
-        await completeModalMutation(ref, response, 'Unable to save booking details.');
+        await completeModalMutation(ref, response, 'Unable to save booking details.', () => updateLocalBookingState(ref, {
+          guest_name: document.getElementById(`name-${ref}`).value,
+          telephone: document.getElementById(`phone-${ref}`).value,
+          email: document.getElementById(`email-${ref}`).value,
+          booking_status: document.getElementById(`status-${ref}`).value,
+          property_name: document.getElementById(`prop-${ref}`).value,
+          room_unit_name: document.getElementById(`room-${ref}`).value,
+          notes: document.getElementById(`notes-${ref}`).value
+        }));
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -1617,7 +1807,7 @@
           body: JSON.stringify({ booking_status: shouldCancel ? 'Canceled' : 'Confirmed' })
         });
         if (!response.ok) throw new Error((await response.json()).error || `Unable to ${action} booking.`);
-        await completeModalMutation(ref, response, `Unable to ${action} booking.`);
+        await completeModalMutation(ref, response, `Unable to ${action} booking.`, () => updateLocalBookingState(ref, { booking_status: shouldCancel ? 'Canceled' : 'Confirmed', status: shouldCancel ? 'Canceled' : 'Confirmed' }));
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -1635,7 +1825,11 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: amt, description: desc, payment_method: method, card_brand: brand, card_last_four: last4 })
         });
-        await completeModalMutation(ref, response, 'Unable to save payment record.');
+        await completeModalMutation(ref, response, 'Unable to save payment record.', result => {
+          const payments = bookingCardPaymentState.get(ref) || [];
+          if (result.payment) payments.push(result.payment);
+          bookingCardPaymentState.set(ref, payments);
+        });
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -1733,11 +1927,35 @@
       } catch (error) { alert(`Error: ${error.message}`); }
     }
 
-    async function removePaymentRecord(ref, paymentId) {
-      if(!confirm('Waive/Delete this record?')) return;
+    async function editPaymentRecord(ref, source, paymentId, currentAmount, encodedMethod, encodedDescription) {
+      if (!paymentId) return alert('This payment cannot be edited.');
+      const amount = Number(prompt('Amount:', currentAmount));
+      const method = prompt('Payment method:', decodeURIComponent(encodedMethod));
+      const description = prompt('Description:', decodeURIComponent(encodedDescription));
+      if (!Number.isFinite(amount) || amount === 0 || !method || description === null) return;
       try {
-        const response = await fetch(`/api/payments/${encodeURIComponent(paymentId)}`, { method: 'DELETE' });
-        await completeModalMutation(ref, response, 'Unable to remove payment record.');
+        const endpoint = source === 'imported' ? `/api/payments/imported/${paymentId}` : `/api/payments/${paymentId}`;
+        const response = await fetch(endpoint, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, payment_method: method, description, user_name: 'Portal User' }) });
+        await completeModalMutation(ref, response, 'Unable to edit payment record.', result => {
+          const payments = bookingCardPaymentState.get(ref) || [];
+          const id = source === 'imported' ? 'imported_id' : 'payment_id';
+          const index = payments.findIndex(payment => String(payment[id]) === String(paymentId));
+          if (index >= 0 && result.payment) payments[index] = { ...payments[index], ...result.payment };
+          bookingCardPaymentState.set(ref, payments);
+        });
+      } catch (error) { alert(`Error: ${error.message}`); }
+    }
+
+    async function removePaymentRecord(ref, source, paymentId) {
+      if(!confirm('Delete this payment record?')) return;
+      try {
+        const endpoint = source === 'imported' ? `/api/payments/imported/${encodeURIComponent(paymentId)}` : `/api/payments/${encodeURIComponent(paymentId)}`;
+        const response = await fetch(endpoint, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name: 'Portal User' }) });
+        await completeModalMutation(ref, response, 'Unable to remove payment record.', () => {
+          const payments = bookingCardPaymentState.get(ref) || [];
+          const id = source === 'imported' ? 'imported_id' : 'payment_id';
+          bookingCardPaymentState.set(ref, payments.map(payment => String(payment[id]) === String(paymentId) ? { ...payment, is_deleted: true } : payment));
+        });
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -1752,38 +1970,48 @@
     // =======================================================================
     // UNPAID LIST RENDERING
     // =======================================================================
+    function renderUnpaidRows(data = []) {
+      const tb = document.getElementById('unpaid-tbody');
+      if (!tb) return;
+      tb.innerHTML = '';
+      const visibleData = data.filter(booking => normalizeBookingStatus(booking).key !== 'cancelled');
+      if (!visibleData.length) {
+        tb.innerHTML = '<tr><td colspan="8" class="text-center py-6 text-slate-500 italic">No unpaid folios.</td></tr>';
+        applyUniversalColumnFilters('#unpaid-table');
+        return;
+      }
+      visibleData.forEach(r => {
+        const enc = encodeBookingData(r);
+        tb.innerHTML += `
+          <tr class="table-row-hover transition" onclick="openUniversalModal('${enc}')">
+            <td class="p-2 font-mono font-bold text-emerald-400"><div class="text-[11px]">${r.booking_reference}</div><div class="text-[9px] text-slate-500 font-sans">${r.room_unit_name}</div></td>
+            <td class="p-2 font-bold text-white"><div class="text-[11px]">${formatGuestNameWithStatus(r.guest_name, r)}</div></td>
+            <td class="p-2 text-[10px] text-amber-300 max-w-[150px] truncate">${depositBadge(r)}${r.notes || ''}</td>
+            <td class="p-2 text-slate-300">${r.property_name}</td>
+            <td class="p-2 text-[9px] text-slate-400 whitespace-nowrap">${r.check_in?.split('T')[0]}</td>
+            <td class="p-2 text-right font-medium">${fmt(r.booked_amount)}</td>
+            <td class="p-2 text-right font-medium text-emerald-400">${fmt(r.total_paid_amount)}</td>
+            <td class="p-2 text-right font-bold text-amber-400">${fmt(r.balance_due)}</td>
+          </tr>`;
+      });
+      applyUniversalColumnFilters('#unpaid-table');
+    }
+
     async function fetchUnpaidReservations(offset = 0) {
       unpaidOffset = offset;
       const prop = document.getElementById('unpaid-filter-property')?.value || 'ALL';
       const from = document.getElementById('unpaid-date-from')?.value || '';
       const to = document.getElementById('unpaid-date-to')?.value || '';
       const search = document.getElementById('unpaid-search')?.value || '';
-      const nameSort = document.getElementById('unpaid-name-sort')?.value || 'name_asc';
-      const hideZeroPaid = document.getElementById('unpaid-hide-zero-paid')?.checked ? 'true' : 'false';
-      const hideBlankNotes = document.getElementById('unpaid-hide-blank-notes')?.checked ? 'true' : 'false';
       try {
-        const res = await fetch(`/api/reservations/unpaid?limit=${limit}&offset=${offset}&property=${encodeURIComponent(prop)}&from_date=${from}&to_date=${to}&search=${encodeURIComponent(search)}&name_sort=${nameSort}&hide_zero_paid=${hideZeroPaid}&hide_blank_notes=${hideBlankNotes}`);
+        const res = await fetch(`/api/reservations/unpaid?limit=${limit}&offset=${offset}&property=${encodeURIComponent(prop)}&from_date=${from}&to_date=${to}&search=${encodeURIComponent(search)}`);
         const { summary, data, total } = await res.json();
         setElText('unpaid-summary-outstanding', fmt(summary?.total_outstanding||0));
         setElText('unpaid-summary-booked', fmt(summary?.total_booked||0));
         setElText('unpaid-summary-count', `${total || 0} Bookings`);
         
-        const tb = document.getElementById('unpaid-tbody'); tb.innerHTML = '';
-        if (!data || data.length === 0) { tb.innerHTML = `<tr><td colspan="8" class="text-center py-6 text-slate-500 italic">No unpaid folios.</td></tr>`; return; }
-        data.forEach(r => {
-          const enc = encodeBookingData(r);
-          tb.innerHTML += `
-            <tr class="table-row-hover transition" onclick="openUniversalModal('${enc}')">
-              <td class="p-2 font-mono font-bold text-emerald-400"><div class="text-[11px]">${r.booking_reference}</div><div class="text-[9px] text-slate-500 font-sans">${r.room_unit_name}</div></td>
-              <td class="p-2 font-bold text-white"><div class="text-[11px]">${r.guest_name}</div></td>
-              <td class="p-2 text-[10px] text-amber-300 max-w-[150px] truncate">${depositBadge(r)}${r.notes || ''}</td>
-              <td class="p-2 text-slate-300">${r.property_name}</td>
-              <td class="p-2 text-[9px] text-slate-400 whitespace-nowrap">${r.check_in?.split('T')[0]}</td>
-              <td class="p-2 text-right font-medium">${fmt(r.booked_amount)}</td>
-              <td class="p-2 text-right font-medium text-emerald-400">${fmt(r.total_paid_amount)}</td>
-              <td class="p-2 text-right font-bold text-amber-400">${fmt(r.balance_due)}</td>
-            </tr>`;
-        });
+        appState.unpaidBookings = data || [];
+        renderUnpaidRows(appState.unpaidBookings);
       } catch (err) {}
     }
 
@@ -1820,17 +2048,25 @@
       setElText('departures-hotel-subtitle', displayHotel);
 
       try {
-        const [opsRes, duplicateRes] = await Promise.all([
-          fetch(`/api/operations/daily?property=${encodeURIComponent(prop)}&date=${date}`),
-          fetch(`/api/operations/duplicate-guests?date=${date}`)
-        ]);
-        if (!opsRes.ok || !duplicateRes.ok) throw new Error('Unable to load handover data');
+        const opsRes = await fetch(`/api/operations/daily?property=${encodeURIComponent(prop)}&date=${date}`);
+        if (!opsRes.ok) throw new Error('Unable to load handover data');
         const data = await opsRes.json();
-        const duplicateGroups = await duplicateRes.json();
-        renderDuplicateGuestWatch(duplicateGroups);
         
         const arr = data.arrivals || [];
         const dep = data.departures || [];
+        const selectedPropertyKeys = new Set(selectedProperties.includes('ALL') || !selectedProperties.length ? [] : selectedProperties.map(value => value.trim().toLowerCase()));
+        const cachedBookings = appState.bookingsByDate.get(date) || new Map();
+        [...arr, ...dep].forEach(booking => {
+          const key = `${String(booking.property_name || '').trim().toLowerCase()}::${booking.booking_reference}`;
+          cachedBookings.set(key, { ...booking, check_in: booking.check_in || date });
+        });
+        appState.bookingsByDate.set(date, cachedBookings);
+        appState.bookings = [...cachedBookings.values()];
+        window.setTimeout(() => {
+          const snapshot = appState.bookings.slice();
+          const groups = buildCrossPropertyGuestGroups(snapshot);
+          renderDuplicateGuestWatch(groups);
+        }, 0);
         const totalDue = arr.reduce((acc, row) => acc + Math.max(0, parseFloat(row.balance_due || 0)), 0);
 
         setElText('cliq-total-arrivals', arr.length);
@@ -1846,7 +2082,7 @@
           lis += `<li><b class="text-white">${unpaidArr.length}</b> arrival(s) have pending balances totaling <b class="text-[#fbbf24]">£${totalDue.toFixed(2)}</b> (collect on arrival).</li>`;
           
           unpaidArr.slice(0, 3).forEach(a => {
-            lis += `<li>Arrival: <b>${a.guest_name}</b> (Room ${a.room_unit_name || 'N/A'}) - Balance: <span class="text-[#fbbf24]">£${parseFloat(a.balance_due).toFixed(2)}</span></li>`;
+            lis += `<li>Arrival: <b>${formatGuestNameWithStatus(a.guest_name, a)}</b> (Room ${a.room_unit_name || 'N/A'}) - Balance: <span class="text-[#fbbf24]">£${parseFloat(a.balance_due).toFixed(2)}</span></li>`;
           });
           if(unpaidArr.length > 3) lis += `<li><i>- and ${unpaidArr.length - 3} more arrivals listed below...</i></li>`;
           hLight.innerHTML = `<ul class="list-disc list-inside">${lis}</ul>`;
@@ -1858,6 +2094,24 @@
       } catch (e) {}
     }
 
+    function buildCrossPropertyGuestGroups(bookings) {
+      const groups = new Map();
+      bookings.forEach(booking => {
+        if (['canceled', 'cancelled'].includes(String(booking.booking_status || '').trim().toLowerCase())) return;
+        const guestName = String(booking.guest_name || `${booking.guest_first_name || ''} ${booking.guest_last_name || ''}`).trim();
+        const guestKey = guestName.toLowerCase().replace(/\s+/g, ' ');
+        const propertyName = String(booking.property_name || '').trim();
+        if (!guestKey || !propertyName || guestKey === 'guest') return;
+        if (!groups.has(guestKey)) groups.set(guestKey, { guest_name: guestName, reservations: [], properties: new Set() });
+        const group = groups.get(guestKey);
+        group.reservations.push(booking);
+        group.properties.add(propertyName.toLowerCase());
+      });
+      return [...groups.values()]
+        .filter(group => group.properties.size > 1)
+        .map(group => ({ guest_name: group.guest_name, property_count: group.properties.size, reservations: group.reservations }));
+    }
+
     function renderDuplicateGuestWatch(groups = []) {
       const list = document.getElementById('duplicate-guest-list');
       const count = document.getElementById('duplicate-guest-count');
@@ -1866,7 +2120,7 @@
       const validGroups = Array.isArray(groups) ? groups : [];
       count.textContent = `${validGroups.length} ${validGroups.length === 1 ? 'match' : 'matches'}`;
       if (validGroups.length === 0) {
-        list.innerHTML = `<div class="py-3 text-center text-xs text-emerald-300"><i class="fa-solid fa-circle-check mr-1"></i>No same-name guests found across properties.</div>`;
+        list.innerHTML = '';
         return;
       }
 
@@ -1876,7 +2130,7 @@
           const balance = parseFloat(reservation.balance_due || 0);
           return `<button onclick="openUniversalModal('${encoded}')" class="w-full text-left p-2 rounded-lg bg-slate-950/70 hover:bg-slate-800 border border-slate-800 hover:border-amber-500/50 transition group">
             <span class="flex items-center justify-between gap-2"><span class="text-[10px] font-bold text-emerald-300 truncate">${escapeHtml(reservation.property_name || 'Unknown property')}</span><span class="text-[9px] text-slate-500">Check-in</span></span>
-            <span class="flex items-center justify-between gap-2 mt-1"><span class="font-mono text-[9px] text-slate-300">${escapeHtml(reservation.booking_reference)}</span><span class="text-[9px] ${balance > 0 ? 'text-amber-300' : 'text-emerald-300'}">${balance > 0 ? `Due ${fmt(balance)}` : 'Cleared'}</span></span>
+            <span class="flex items-center justify-between gap-2 mt-1"><span class="font-mono text-[9px] text-slate-300">${escapeHtml(reservation.booking_reference)}${formatBookingStatusBadge(reservation)}</span><span class="text-[9px] ${balance > 0 ? 'text-amber-300' : 'text-emerald-300'}">${balance > 0 ? `Due ${fmt(balance)}` : 'Cleared'}</span></span>
             <span class="block text-[9px] text-slate-500 mt-1">Room ${escapeHtml(reservation.room_unit_name || '-')} · ${escapeHtml(reservation.check_in || '-')} to ${escapeHtml(reservation.check_out || '-')}</span>${depositBadge(reservation)}
           </button>`;
         }).join('');
@@ -1912,7 +2166,7 @@
         const paid = parseFloat(r.total_paid_amount || 0);
         const groupTotal = r.order_reference ? groupTotals[r.order_reference] : 0;
         const groupIndex = r.order_reference ? (groupIndexes[r.order_reference] = (groupIndexes[r.order_reference] || 0) + 1) : 0;
-        const groupLabel = groupTotal > 1 ? `<span class="ops-note-pill bg-purple-950/70 border border-purple-700/70 text-purple-200">Group: ${r.guest_name} (${groupIndex}/${groupTotal})</span>` : '';
+        const groupLabel = groupTotal > 1 ? `<span class="ops-note-pill bg-purple-950/70 border border-purple-700/70 text-purple-200">Group: ${formatGuestNameWithStatus(r.guest_name, r)} (${groupIndex}/${groupTotal})</span>` : '';
         const noteLabel = `${depositBadge(r)}${r.notes ? `<span class="ops-note-pill bg-amber-950/70 border border-amber-700/70 text-amber-200" title="${r.notes}">${r.notes}</span>` : (!groupLabel ? '<span class="text-slate-600">&mdash;</span>' : '')}`;
         const contact = r.telephone || r.email || 'No Contact';
         const contactTooltip = [r.telephone, r.email].filter(Boolean).join(' · ') || 'No Contact';
@@ -1922,7 +2176,7 @@
         tb.innerHTML += `
           <tr class="table-row-hover transition" onclick="openUniversalModal('${enc}')">
             <td class="font-mono font-bold text-slate-200 whitespace-nowrap"><div class="text-[10px]">${r.booking_reference}</div><div class="text-[9px] text-emerald-400 font-sans">${roomLabel(r.room_unit_name)}</div></td>
-            <td class="font-bold text-white text-[11px]">${r.guest_name}</td>
+            <td class="font-bold text-white text-[11px]">${formatGuestNameWithStatus(r.guest_name, r)}</td>
             <td class="ops-note-cell text-[9px]">${groupLabel}${noteLabel}</td>
             <td class="ops-contact-cell text-[9px] text-slate-400" title="${escapeHtml(contactTooltip)}"><div>${escapeHtml(contact)}</div></td>
             <td class="text-[9px] text-slate-400 whitespace-nowrap leading-tight">${dates}</td>
@@ -2042,7 +2296,8 @@
             const w = Math.max(1, end - start) * 130;
             const balDue = parseFloat(bk.balance_due || 0);
             const totalChgs = parseFloat(bk.total_charges || 0); 
-            const isCanceled = ['canceled', 'cancelled'].includes(String(bk.booking_status || '').trim().toLowerCase());
+            const calendarStatus = normalizeBookingStatus(bk);
+            const isCanceled = calendarStatus.key === 'cancelled';
 
             // Check overlap for overbooking stripes
             const bStartTime = new Date(bk.check_in).getTime();
@@ -2059,12 +2314,13 @@
 
             const bgClass = isCanceled
               ? `bg-rose-950/80 text-rose-200 border-rose-500/80 ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`
-              : `bg-orange-500 text-orange-950 border-orange-600 ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`;
+              : `${calendarStatus.key === 'noshow' ? 'status-noshow' : 'bg-orange-500 text-orange-950 border-orange-600'} ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`;
             const enc = encodeBookingData(bk);
             const statusIcon = isCanceled ? '<i class="fa-solid fa-ban mr-1 text-rose-300" title="Canceled reservation"></i>' : '';
-            const statusLabel = isCanceled ? 'Canceled - click to edit' : `Open ${bk.guest_name || 'reservation'}`;
+            const statusIconHtml = calendarStatus.key === 'noshow' ? '<i class="fa-solid fa-triangle-exclamation mr-1 text-orange-200" title="No show"></i>' : statusIcon;
+            const statusLabel = calendarStatus.label ? `${calendarStatus.label} - click to edit` : `Open ${bk.guest_name || 'reservation'}`;
             
-            html += `<div onclick="event.stopPropagation(); openUniversalModal('${enc}')" title="${statusLabel}" style="left: ${start*130 + 3}px; width: ${w - 6}px; top: 6px;" class="calendar-booking absolute h-9 rounded border px-1.5 py-0.5 text-[10px] cursor-pointer shadow-md flex items-center justify-between overflow-hidden transition-all ${bgClass} ${isOverlap ? 'is-overlap' : ''}"><div class="truncate font-bold flex items-center">${statusIcon}${otaIcon} ${bk.guest_name} ${noteIconHtml}</div><div class="text-[9px] shrink-0">${isCanceled ? '<span class="font-bold">CANCELED</span>' : icons}</div></div>`;
+            html += `<div onclick="event.stopPropagation(); openUniversalModal('${enc}')" title="${statusLabel}" style="left: ${start*130 + 3}px; width: ${w - 6}px; top: 6px;" class="calendar-booking absolute h-9 rounded border px-1.5 py-0.5 text-[10px] cursor-pointer shadow-md flex items-center justify-between overflow-hidden transition-all ${bgClass} ${isOverlap ? 'is-overlap' : ''}"><div class="truncate font-bold flex items-center">${statusIconHtml}${otaIcon} ${formatGuestNameWithStatus(bk.guest_name, bk)} ${noteIconHtml}</div><div class="text-[9px] shrink-0">${calendarStatus.label ? `<span class="font-bold">${calendarStatus.label.toUpperCase()}</span>` : icons}</div></div>`;
           });
           html += `</div></div>`;
         });
@@ -2123,12 +2379,6 @@
       if (document.getElementById('overview-exclude-canceled')?.checked) query += '&exclude_canceled=true';
       if (includeLedgerFilters) {
         if (overviewFilter.channel) query += `&channel=${encodeURIComponent(overviewFilter.channel)}`;
-        const propertyFilter = document.getElementById('ledger-property-filter')?.value.trim();
-        const guestFilter = document.getElementById('ledger-guest-filter')?.value.trim();
-        const checkoutFilter = document.getElementById('ledger-checkout-filter')?.value;
-        if (propertyFilter) query += `&property_filter=${encodeURIComponent(propertyFilter)}`;
-        if (guestFilter) query += `&guest_filter=${encodeURIComponent(guestFilter)}`;
-        if (checkoutFilter) query += `&checkout_filter=${checkoutFilter}`;
       }
       return query;
     }
@@ -2182,7 +2432,7 @@
       document.getElementById('ai-report-brief-body').innerHTML = `<div class="font-semibold text-white">${escapeHtml(brief.headline)}</div><div class="mt-1 text-slate-400">${escapeHtml(brief.summary)}</div><div class="mt-2 ${brief.warnings.length ? 'text-amber-300' : 'text-emerald-300'}"><i class="fa-solid ${brief.warnings.length ? 'fa-triangle-exclamation' : 'fa-circle-check'} mr-1"></i>${escapeHtml(brief.auditStatus)}</div>${brief.warnings.length ? `<ul class="mt-2 list-disc list-inside text-amber-200/80">${brief.warnings.map(warning => `<li>${escapeHtml(warning)}</li>`).join('')}</ul>` : ''}`;
       const rowColumns = data.rows.length ? Object.keys(data.rows[0]) : (data.columns || []);
       currentAiReport.columns = rowColumns;
-      document.getElementById('ai-report-thead').innerHTML = `<tr>${rowColumns.map(column => `<th class="px-3 py-2 whitespace-nowrap">${escapeHtml(column)}</th>`).join('')}</tr>`;
+      document.getElementById('ai-report-thead').innerHTML = `<tr>${rowColumns.map(column => `<th class="px-3 py-2">${compactHeaderLabel(column)}</th>`).join('')}</tr>`;
       document.getElementById('ai-report-tbody').innerHTML = data.rows.length ? data.rows.map(row => `<tr>${rowColumns.map(column => `<td class="px-3 py-2 whitespace-nowrap">${escapeHtml(row[column] == null ? '' : row[column])}</td>`).join('')}</tr>`).join('') : `<tr><td colspan="${Math.max(rowColumns.length, 1)}" class="p-8 text-center text-slate-500">No records matched this report.</td></tr>`;
       renderAiChart();
     }
@@ -2277,7 +2527,7 @@
 
     async function previewTaskData() {
       const task = document.getElementById('task-type')?.value; const preview = document.getElementById('task-preview'); if (!task || !preview) return;
-      try { const response = await fetch('/api/daily-tasks/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task, property: document.getElementById('task-property').value, date: document.getElementById('task-date').value, mapping: taskMapping }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error); preview.innerHTML = result.mappedRows.length ? `<table class="w-full"><thead><tr>${taskMapping.map(item => `<th class="text-left border-b border-slate-700 p-1 whitespace-nowrap">${escapeHtml(item.header)}</th>`).join('')}</tr></thead><tbody>${result.mappedRows.slice(0, 10).map(row => `<tr>${row.map(value => `<td class="border-b border-slate-800 p-1 whitespace-nowrap">${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<div class="p-4 text-center text-slate-500">No data for this task date.</div>'; } catch (error) { preview.innerHTML = `<div class="text-rose-300 p-2">${escapeHtml(error.message)}</div>`; }
+      try { const response = await fetch('/api/daily-tasks/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task, property: document.getElementById('task-property').value, date: document.getElementById('task-date').value, mapping: taskMapping }) }); const result = await response.json(); if (!response.ok) throw new Error(result.error); preview.innerHTML = result.mappedRows.length ? `<table class="w-full"><thead><tr>${taskMapping.map(item => `<th class="text-left border-b border-slate-700 p-1">${compactHeaderLabel(item.header)}</th>`).join('')}</tr></thead><tbody>${result.mappedRows.slice(0, 10).map(row => `<tr>${row.map(value => `<td class="border-b border-slate-800 p-1 whitespace-nowrap">${escapeHtml(value)}</td>`).join('')}</tr>`).join('')}</tbody></table>` : '<div class="p-4 text-center text-slate-500">No data for this task date.</div>'; } catch (error) { preview.innerHTML = `<div class="text-rose-300 p-2">${escapeHtml(error.message)}</div>`; }
     }
 
     async function syncDailyTask() {
@@ -2353,7 +2603,7 @@
             <tr class="table-row-hover transition border-l-4 ${r.exception_type === 'Post-departure debt' ? 'border-l-rose-500' : r.exception_type === 'In-house unpaid' ? 'border-l-amber-400' : r.exception_type === 'Upcoming deposit due' ? 'border-l-sky-400' : isRefund ? 'border-l-sky-500' : 'border-l-amber-500'}" onclick="openUniversalModal('${enc}')">
               <td>${r.property_name||'-'}</td>
               <td class="font-mono text-emerald-400 font-semibold">${r.booking_reference}</td>
-              <td class="max-w-[150px] truncate" title="${r.notes||''}">${r.guest_name} ${depositBadge(r)}<span class="text-[9px] text-slate-500">${r.notes?' - '+r.notes:''}</span></td>
+              <td class="max-w-[150px] truncate" title="${r.notes||''}">${formatGuestNameWithStatus(r.guest_name, r)} ${depositBadge(r)}<span class="text-[9px] text-slate-500">${r.notes?' - '+r.notes:''}</span></td>
               <td><span class="px-1.5 py-0.5 text-[9px] font-semibold rounded border ${bc}">${r.exception_type}</span></td>
               <td class="text-[10px] text-slate-400">${r.check_out?.split('T')[0]}</td>
               <td class="text-right">${fmt(r.net_total)}</td>
@@ -2361,16 +2611,16 @@
               <td class="text-right font-bold ${isRefund?'text-sky-300':'text-rose-400'}">${fmt(r.exposure)}</td>
             </tr>`;
         });
+          applyUniversalColumnFilters('#recon-table');
         setElText('pagination-info', total ? `Showing ${offset+1}-${Math.min(offset+limit, total)} of ${total}` : '0 exceptions');
-        const filterLabel = [overviewFilter.channel, overviewFilter.fromDate && `${overviewFilter.fromDate} to ${overviewFilter.toDate}`, document.getElementById('ledger-property-filter')?.value.trim(), document.getElementById('ledger-guest-filter')?.value.trim(), document.getElementById('ledger-checkout-filter')?.value].filter(Boolean).join(' · ');
+          const filterLabel = [overviewFilter.channel, overviewFilter.fromDate && `${overviewFilter.fromDate} to ${overviewFilter.toDate}`].filter(Boolean).join(' · ');
         setElText('overview-filter-label', filterLabel ? `Filtered: ${filterLabel}` : '');
         document.getElementById('overview-clear-filters')?.classList.toggle('hidden', !filterLabel);
       } catch(e) {}
     }
     function setOverviewChannel(channel) { overviewFilter.channel = channel; overviewFilter.fromDate = ''; overviewFilter.toDate = ''; fetchReconciliation(0); }
     function setOverviewPeriod(fromDate, toDate) { overviewFilter.channel = ''; overviewFilter.fromDate = String(fromDate || '').split('T')[0]; overviewFilter.toDate = String(toDate || fromDate || '').split('T')[0]; fetchReconciliation(0); }
-    function clearOverviewFilters() { overviewFilter = { channel: '', fromDate: '', toDate: '' }; ['ledger-property-filter', 'ledger-guest-filter', 'ledger-checkout-filter'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; }); fetchReconciliation(0); }
-    function debounceLedgerFilter() { clearTimeout(ledgerFilterTimer); ledgerFilterTimer = setTimeout(() => fetchReconciliation(0), 250); }
+    function clearOverviewFilters() { overviewFilter = { channel: '', fromDate: '', toDate: '' }; fetchReconciliation(0); }
     function updateSettledCashMethodOptions(methods) {
       settledCashMethods = [...new Set(methods.map(method => String(method || '').trim()).filter(Boolean))];
       ['settled-cash-method', 'settled-cash-method-drawer'].forEach(id => {
@@ -2410,12 +2660,12 @@
       const format = document.getElementById('settled-cash-export').value;
       if (!settledCashTransactions.length) return alert('No transactions to export.');
       if (format === 'csv') {
-        const rows = [['Date', 'Property', 'Booking Reference', 'Method', 'Amount', 'Description'], ...settledCashTransactions.map(row => [row.date, row.property_name, row.booking_reference, row.payment_method, row.amount, row.description])];
+        const rows = [['DATE', 'PROPERTY', 'REF', 'METHOD', 'AMOUNT', 'DESC'], ...settledCashTransactions.map(row => [row.date, row.property_name, row.booking_reference, row.payment_method, row.amount, row.description])];
         const csv = rows.map(row => row.map(value => `"${String(value ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
         const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = 'period-settled-cash.csv'; link.click(); URL.revokeObjectURL(link.href); return;
       }
       const printWindow = window.open('', '_blank');
-      printWindow.document.write(`<html><head><title>Period Settled Cash</title><style>body{font-family:Arial,sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}th:nth-child(5),td:nth-child(5){text-align:right}</style></head><body><h1>Period Settled Cash</h1><table><thead><tr><th>Date</th><th>Property</th><th>Booking Reference</th><th>Method</th><th>Amount</th><th>Description</th></tr></thead><tbody>${settledCashTransactions.map(row => `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.property_name)}</td><td>${escapeHtml(row.booking_reference)}</td><td>${escapeHtml(row.payment_method)}</td><td>${escapeHtml(row.amount)}</td><td>${escapeHtml(row.description)}</td></tr>`).join('')}</tbody></table><scr` + `ipt>window.print();</scr` + `ipt></body></html>`);
+      printWindow.document.write(`<html><head><title>Period Settled Cash</title><style>body{font-family:Arial,sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px;text-align:left}th:nth-child(5),td:nth-child(5){text-align:right}</style></head><body><h1>Period Settled Cash</h1><table><thead><tr><th>DATE</th><th>PROPERTY</th><th>REF</th><th>METHOD</th><th>AMOUNT</th><th>DESC</th></tr></thead><tbody>${settledCashTransactions.map(row => `<tr><td>${escapeHtml(row.date)}</td><td>${escapeHtml(row.property_name)}</td><td>${escapeHtml(row.booking_reference)}</td><td>${escapeHtml(row.payment_method)}</td><td>${escapeHtml(row.amount)}</td><td>${escapeHtml(row.description)}</td></tr>`).join('')}</tbody></table><scr` + `ipt>window.print();</scr` + `ipt></body></html>`);
       printWindow.document.close();
     }
     function changePage(d) { fetchReconciliation(currentOffset + (d*limit)); }
@@ -2476,7 +2726,7 @@
           d.innerHTML += `
             <div class="p-2 hover:bg-slate-800 cursor-pointer flex justify-between text-[11px] border-b border-slate-800" onclick="openUniversalModal('${enc}')">
               <div>
-                <div class="font-bold text-white text-xs">${item.guest_name}</div>
+                <div class="font-bold text-white text-xs">${formatGuestNameWithStatus(item.guest_name, item)}</div>
                 <div class="text-slate-400 font-mono text-[9px] mt-0.5">${item.booking_reference}</div>
                 <div class="text-emerald-400 text-[9px] mt-0.5"><i class="fa-solid fa-hotel mr-1"></i>${item.property_name} - ${item.room_unit_name}</div>
                 ${depositBadge(item)}

@@ -46,6 +46,25 @@ function paymentDateKey(dateStr) {
   return `${date.slice(8, 10)}${date.slice(5, 7)}${date.slice(0, 4)}`;
 }
 
+function parseEviivoTimestamp(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})\s+(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?/);
+  if (match) {
+    const monthMap = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+    const year = Number(match[3]) < 100 ? 2000 + Number(match[3]) : Number(match[3]);
+    const date = new Date(year, monthMap[match[2].toLowerCase()], Number(match[1]), Number(match[4]), Number(match[5]), Number(match[6] || 0), Number(`0.${match[7] || 0}`) * 1000);
+    if (!Number.isNaN(date.getTime())) {
+      const pad = number => String(number).padStart(2, '0');
+      return `${year}-${pad(Number(match[2] ? monthMap[match[2].toLowerCase()] + 1 : date.getMonth() + 1))}-${pad(Number(match[1]))} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, '0')}`;
+    }
+  }
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return null;
+  const pad = number => String(number).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${String(date.getMilliseconds()).padStart(3, '0')}`;
+}
+
 // --- Helper: تنظيف الأرقام والعملات (£129.00 -> 129.00) ---
 function parseSafeFloat(val) {
   if (val === undefined || val === null || val === '') return 0.0;
@@ -82,6 +101,60 @@ async function ensureSourceColumns(client, tableName, headers, reserved) {
 }
 
 function valuesForSourceColumns(row, mapping) { return mapping.map(item => row[item.header] ?? null); }
+
+function firstSourceValue(row, names) {
+  for (const name of names) {
+    if (row[name] !== undefined && row[name] !== null && String(row[name]).trim() !== '') return row[name];
+  }
+  return null;
+}
+
+function paymentMethodFromRow(row, allHeaders = []) {
+  return String(row['PaymentMethod'] || row['Payment Method'] || row[allHeaders[55]] || '').trim();
+}
+
+function isPlaceholderPaymentMethod(value) {
+  return /see\s+(above|below)/i.test(String(value || ''));
+}
+
+function paymentAmountFromRow(row, allHeaders = []) {
+  return parseSafeFloat(
+    row[allHeaders[74]] || row['Direct1'] || row['Total Paid'] || row['SettledAmount'] || row['OTAPrepaid1'] || row['Amount'] || 0
+  );
+}
+
+function findMasterPaymentRow(entries, allHeaders = []) {
+  return entries.find(entry => {
+    const method = paymentMethodFromRow(entry.row, allHeaders);
+    return paymentAmountFromRow(entry.row, allHeaders) > 0 && method && !isPlaceholderPaymentMethod(method);
+  });
+}
+
+function bookingRate(booking) {
+  const raw = booking?.raw_data && typeof booking.raw_data === 'object' ? booking.raw_data : {};
+  return Math.max(0, parseSafeFloat(firstSourceValue(raw, [
+    'Base Rate', 'BaseRate', 'base_rate', 'Revenue', 'revenue',
+    'Room/Unit Revenue', 'room_unit_revenue', 'Room Rate', 'room_rate'
+  ]) ?? booking?.total_revenue));
+}
+
+async function allocateGroupPayment(client, { orderReference, amount }) {
+  const normalizedOrderReference = String(orderReference || '').trim();
+  if (!normalizedOrderReference) return [];
+  const result = await client.query(`
+    SELECT booking_reference, room_unit_name, total_revenue, raw_data
+    FROM bookings
+    WHERE order_reference = $1
+    ORDER BY id;
+  `, [normalizedOrderReference]);
+  return result.rows
+    .map(booking => ({
+      bookingReference: booking.booking_reference,
+      roomId: booking.room_unit_name || booking.booking_reference,
+      amount: bookingRate(booking)
+    }))
+    .filter(allocation => allocation.bookingReference && allocation.amount > 0);
+}
 
 // --- 1. استيراد الحجوزات (Bookings) ---
 async function importBookings(filePath, groupName) {
@@ -250,10 +323,22 @@ async function importPayments(filePath, groupName) {
           await client.query('BEGIN');
           const allHeaders = Object.keys(rows[0] || {});
           const sourceHeaders = allHeaders.slice(38, 75);
-          const sourceMapping = await ensureSourceColumns(client, 'payments', sourceHeaders, new Set(['id', 'payment_id', 'unique_payment_key', 'booking_reference', 'order_reference', 'received_date_time', 'guest_name', 'business_name', 'room_name', 'channel', 'channel_reference', 'payment_type', 'payment_method', 'property_name', 'currency', 'payment_status', 'payment_date', 'amount', 'created_at', 'raw_data']));
+          const sourceMapping = await ensureSourceColumns(client, 'payments', sourceHeaders, new Set(['id', 'payment_id', 'unique_payment_key', 'booking_reference', 'order_reference', 'received_date_time', 'guest_name', 'business_name', 'room_name', 'channel', 'channel_reference', 'payment_type', 'payment_method', 'property_name', 'currency', 'payment_status', 'payment_date', 'amount', 'user_name', 'last_updated_date_time', 'is_deleted', 'created_at', 'raw_data']));
+          const paymentGroups = new Map();
+          rows.forEach((candidate, candidateIndex) => {
+            const candidateOrderRef = String(candidate['OrderReference'] ?? candidate['Order Ref.'] ?? '').trim();
+            const groupKey = candidateOrderRef || `__single_${candidateIndex}`;
+            if (!paymentGroups.has(groupKey)) paymentGroups.set(groupKey, []);
+            paymentGroups.get(groupKey).push({ row: candidate, rowIndex: candidateIndex });
+          });
 
-          for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
-            const row = rows[rowIndex];
+          for (const [groupKey, groupRows] of paymentGroups.entries()) {
+            const masterEntry = findMasterPaymentRow(groupRows, allHeaders);
+            const orderReference = String(groupRows[0].row['OrderReference'] ?? groupRows[0].row['Order Ref.'] ?? '').trim();
+            if (orderReference && groupRows.length > 1 && !masterEntry) continue;
+            const sourceEntry = masterEntry || groupRows[0];
+            const row = sourceEntry.row;
+            const rowIndex = sourceEntry.rowIndex;
             // Payment Report positions: AU = index 46, BD = index 55, BW = index 74.
             const bookingRef = String(row['BookingReference'] ?? row['Booking Reference'] ?? row[allHeaders[46]] ?? '').trim();
             const orderRef = String(row['OrderReference'] ?? row['Order Ref.'] ?? '').trim();
@@ -261,63 +346,82 @@ async function importPayments(filePath, groupName) {
             const rawPaymentId = String(paymentIdValue).trim();
             const rawRoomId = String(row['RoomId'] ?? row['Room ID'] ?? row['Room'] ?? '').trim();
             const receivedDateValue = row['ReceivedDateTime'] ?? row['Payment Date'] ?? row['BookedDate'];
-            const uniquePaymentKey = `${paymentDateKey(receivedDateValue)}_${rawPaymentId}_${bookingRef}_${rawRoomId}`;
-
-            if (!rawPaymentId || !bookingRef || !rawRoomId || !paymentDateKey(receivedDateValue)) continue;
+            if (!rawPaymentId || !bookingRef || !paymentDateKey(receivedDateValue)) continue;
 
             // اسم الفندق من عمود business_name
             const propertyName = (row['business_name'] || row['Property'] || groupName).trim();
             
             // قراءة القيمة من Direct1 أو Total Paid
-            const amount = parseSafeFloat(
-              row[allHeaders[74]] ||
-              row['Direct1'] || 
-              row['Total Paid'] || 
-              row['SettledAmount'] || 
-              row['OTAPrepaid1'] || 
-              row['Amount'] || 
-              0
-            );
+            const amount = paymentAmountFromRow(row, allHeaders);
 
             const currency = 'GBP';
-            const paymentMethod = String(row['PaymentMethod'] || row['Payment Method'] || row[allHeaders[55]] || '').trim();
+            const paymentMethod = paymentMethodFromRow(row, allHeaders);
             const paymentStatus = (row['PaymentType2'] || row['Payment Status'] || 'Success').trim();
             const paymentDate = parseSafeDate(row['ReceivedDateTime'] || row['Payment Date'] || row['BookedDate']);
+            const userName = String(row['UserName'] || row.User || '').trim() || 'Eviivo Import';
+            const lastUpdatedDateTime = parseEviivoTimestamp(row['LastUpdatedDateTime'] || row.Updated) || paymentDate;
+            const allocations = orderRef && groupRows.length > 1
+              ? await allocateGroupPayment(client, { orderReference: orderRef, amount })
+              : [{ bookingReference: bookingRef, roomId: rawRoomId || bookingRef, amount }];
+            if (!allocations.length) continue;
+
+            if (orderRef && allocations.length > 1) {
+              // Remove rows written by the legacy importer, which stored the master
+              // amount against the first room and used the unsuffixed payment ID.
+              await client.query(`
+                DELETE FROM payments
+                WHERE order_reference = $1
+                  AND payment_id = $2
+                  AND CAST(COALESCE(payment_date, received_date_time) AS DATE) = $3::DATE;
+              `, [orderRef, rawPaymentId, paymentDateKey(receivedDateValue).replace(/^(\d{2})(\d{2})(\d{4})$/, '$3-$2-$1')]);
+            }
 
             const query = `
               INSERT INTO payments (
-                payment_id, unique_payment_key, booking_reference, order_reference, property_name, received_date_time,
-                amount, currency, payment_method, payment_status, payment_date, raw_data,
+                payment_id, unique_payment_key, booking_reference, order_reference, property_name, room_name, received_date_time,
+                amount, currency, payment_method, payment_status, payment_date, user_name, last_updated_date_time, raw_data,
                 ${sourceMapping.map(item => `"${item.name}"`).join(', ')}
               ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                $7, $8, $9, $10, $11, $12,
-                ${sourceMapping.map((_, index) => `$${13 + index}`).join(', ')}
+                $1, $2, $3, $4, $5, $6, $7,
+                $8, $9, $10, $11, $12, $13, $14, $15,
+                ${sourceMapping.map((_, index) => `$${16 + index}`).join(', ')}
               )
               ON CONFLICT (unique_payment_key) DO UPDATE SET
                 payment_id = EXCLUDED.payment_id,
                 booking_reference = EXCLUDED.booking_reference,
                 order_reference = EXCLUDED.order_reference,
                 property_name = EXCLUDED.property_name,
+                room_name = EXCLUDED.room_name,
                 received_date_time = EXCLUDED.received_date_time,
                 amount = EXCLUDED.amount,
                 currency = EXCLUDED.currency,
                 payment_method = EXCLUDED.payment_method,
                 payment_status = EXCLUDED.payment_status,
                 payment_date = EXCLUDED.payment_date,
+                user_name = EXCLUDED.user_name,
+                is_deleted = FALSE,
+                last_updated_date_time = EXCLUDED.last_updated_date_time,
                 raw_data = EXCLUDED.raw_data,
                 ${sourceMapping.map(item => `"${item.name}" = EXCLUDED."${item.name}"`).join(', ')};
             `;
 
-            const params = [
-              rawPaymentId, uniquePaymentKey, bookingRef, orderRef, propertyName,
-              paymentDate, amount, currency, paymentMethod, paymentStatus, paymentDate,
-              JSON.stringify(Object.fromEntries(sourceHeaders.map(header => [header, row[header] ?? null]))),
-              ...valuesForSourceColumns(row, sourceMapping)
-            ];
+            for (const allocation of allocations) {
+              const allocationRoomId = allocation.roomId || rawRoomId;
+              const allocationBookingReference = allocation.bookingReference || bookingRef;
+              const allocationIdentity = `${orderRef || bookingRef}_${allocationBookingReference}`;
+              const uniquePaymentKey = `${paymentDateKey(receivedDateValue)}_${rawPaymentId}_${allocationIdentity}`;
+              const allocationPaymentId = allocations.length > 1 ? `${rawPaymentId}-${allocationBookingReference}` : rawPaymentId;
+              const params = [
+                allocationPaymentId, uniquePaymentKey, allocationBookingReference, orderRef, propertyName, allocationRoomId,
+                paymentDate, allocation.amount, currency, paymentMethod, paymentStatus, paymentDate,
+                userName, lastUpdatedDateTime,
+                JSON.stringify(Object.fromEntries(sourceHeaders.map(header => [header, row[header] ?? null]))),
+                ...valuesForSourceColumns(row, sourceMapping)
+              ];
 
-            await client.query(query, params);
-            insertedCount++;
+              await client.query(query, params);
+              insertedCount++;
+            }
           }
 
           await client.query('COMMIT');
@@ -375,4 +479,4 @@ if (require.main === module) {
   run();
 }
 
-module.exports = { importBookings, importPayments, run };
+module.exports = { allocateGroupPayment, findMasterPaymentRow, importBookings, importPayments, run };

@@ -53,6 +53,9 @@ CREATE TABLE payments (
     payment_status VARCHAR(100),
     payment_date TIMESTAMP,
     amount NUMERIC(10, 2),
+    user_name VARCHAR(255) NOT NULL DEFAULT 'Eviivo Import',
+    last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
     raw_data JSONB NOT NULL DEFAULT '{}'::JSONB,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT payments_unique_payment_key UNIQUE (unique_payment_key)
@@ -80,6 +83,28 @@ DROP INDEX IF EXISTS payments_payment_id_key;
 DROP INDEX IF EXISTS payments_payment_id_unique;
 DROP INDEX IF EXISTS payments_identity_idx;
 CREATE UNIQUE INDEX IF NOT EXISTS payments_unique_payment_key_idx ON payments(unique_payment_key);
+
+CREATE TABLE IF NOT EXISTS reservation_payments (
+    payment_id SERIAL PRIMARY KEY,
+    booking_reference VARCHAR(100) NOT NULL,
+    order_reference VARCHAR(100),
+    amount NUMERIC(10, 2) NOT NULL,
+    payment_method VARCHAR(50) NOT NULL,
+    card_brand VARCHAR(50),
+    card_last_four VARCHAR(4),
+    description TEXT,
+    payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    user_name VARCHAR(255) NOT NULL DEFAULT 'Portal User',
+    last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_reservation_payments_booking_ref ON reservation_payments(booking_reference);
+
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS user_name VARCHAR(255) NOT NULL DEFAULT 'Eviivo Import';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE reservation_payments ADD COLUMN IF NOT EXISTS user_name VARCHAR(255) NOT NULL DEFAULT 'Portal User';
+ALTER TABLE reservation_payments ADD COLUMN IF NOT EXISTS last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS petty_expenses (
     id SERIAL PRIMARY KEY,
