@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^Get-ChildItem \\.\\\\raw_data -Recurse -Filter \\*\\.csv \\| Select-Object -First 1 \\| ForEach-Object \\{ Get-Content \\$_\\.FullName -TotalCount 1 \\}$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

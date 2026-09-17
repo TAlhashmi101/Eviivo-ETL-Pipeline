@@ -1,0 +1,38 @@
+{
+  "name": "eviivo-etl-pipeline",
+  "version": "1.0.0",
+  "description": "Automated ETL pipeline and analytical API for Eviivo property data",
+  "main": "src/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "init": "node src/init-db.js",
+    "reset-db": "node src/init-db.js",
+    "import": "node src/importData.js",
+    "views": "node src/createViews.js",
+    "server": "node src/server.js",
+    "watch": "node src/watcher.js",
+    "dev": "concurrently \"npm run server\" \"npm run watch\""
+  },
+  "keywords": [
+    "eviivo",
+    "etl",
+    "postgresql",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "cors": "^2.8.6",
+    "csv-parser": "^3.2.1",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "googleapis": "^178.1.1",
+    "multer": "^2.4.0",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}
