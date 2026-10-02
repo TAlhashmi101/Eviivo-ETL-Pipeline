@@ -113,6 +113,10 @@ function paymentMethodFromRow(row, allHeaders = []) {
   return String(row['PaymentMethod'] || row['Payment Method'] || row[allHeaders[55]] || '').trim();
 }
 
+function paymentDescriptionFromRow(row) {
+  return String(row['Description'] || row['Payment Description'] || row['PaymentType2'] || row['Payment Status'] || '').trim();
+}
+
 function isPlaceholderPaymentMethod(value) {
   return /see\s+(above|below)/i.test(String(value || ''));
 }
@@ -138,22 +142,87 @@ function bookingRate(booking) {
   ]) ?? booking?.total_revenue));
 }
 
-async function allocateGroupPayment(client, { orderReference, amount }) {
+async function allocateGroupPayment(client, { orderReference, amount, paymentMethod, description }) {
   const normalizedOrderReference = String(orderReference || '').trim();
   if (!normalizedOrderReference) return [];
-  const result = await client.query(`
-    SELECT booking_reference, room_unit_name, total_revenue, raw_data
-    FROM bookings
-    WHERE order_reference = $1
-    ORDER BY id;
-  `, [normalizedOrderReference]);
-  return result.rows
-    .map(booking => ({
-      bookingReference: booking.booking_reference,
-      roomId: booking.room_unit_name || booking.booking_reference,
-      amount: bookingRate(booking)
-    }))
-    .filter(allocation => allocation.bookingReference && allocation.amount > 0);
+
+  await client.query('BEGIN');
+
+  try {
+    const result = await client.query(`
+      SELECT booking_reference, room_unit_name, total_revenue, raw_data, id
+      FROM bookings
+      WHERE order_reference = $1
+      ORDER BY id
+      FOR UPDATE;
+    `, [normalizedOrderReference]);
+
+    const allocations = (result.rows || [])
+      .map(booking => ({
+        bookingReference: booking.booking_reference,
+        roomId: booking.room_unit_name || booking.booking_reference,
+        amountBase: bookingRate(booking),
+        bookingId: booking.id
+      }))
+      .filter(allocation => allocation.bookingReference && allocation.amountBase > 0);
+
+    if (!allocations.length) {
+      await client.query('COMMIT');
+      return [];
+    }
+
+    const totalBase = allocations.reduce((sum, item) => sum + Number(item.amountBase || 0), 0);
+    if (!Number.isFinite(totalBase) || totalBase <= 0) {
+      throw new Error(`Group payment allocation failed: invalid base total for ${normalizedOrderReference}`);
+    }
+
+    const inserted = [];
+    for (const allocation of allocations) {
+      const share = Number(amount) * (Number(allocation.amountBase) / totalBase);
+      if (!Number.isFinite(share) || share < 0) {
+        throw new Error(`Invalid proportional allocation for ${allocation.bookingReference}`);
+      }
+
+      const paymentInsert = await client.query(`
+        INSERT INTO reservation_payments (
+          booking_reference,
+          payment_method,
+          amount,
+          payment_date,
+          description
+        ) VALUES (
+          $1,
+          $2,
+          $3,
+          NOW(),
+          $4
+        )
+        ON CONFLICT DO NOTHING;
+      `, [
+        allocation.bookingReference,
+        paymentMethod,
+        share.toFixed(2),
+        description
+      ]);
+
+      if (paymentInsert.rowCount === null || paymentInsert.rowCount === 0) {
+        throw new Error(`Failed to allocate share for room ${allocation.bookingReference}`);
+      }
+
+      inserted.push({
+        bookingReference: allocation.bookingReference,
+        roomId: allocation.roomId,
+        allocatedAmount: Number(share.toFixed(2))
+      });
+    }
+
+    await client.query('COMMIT');
+    return inserted;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error(`❌ Group allocation failed for ${normalizedOrderReference}:`, error.message);
+    throw error;
+  }
 }
 
 // --- 1. استيراد الحجوزات (Bookings) ---
@@ -222,6 +291,7 @@ async function importBookings(filePath, groupName) {
             const adults = parseSafeInt(row['Adults']) || 1;
             const children = parseSafeInt(row['Children']) || 0;
 
+            // Keep damage-deposit/ancillary revenue independent from the core room total.
             const otherRevenue = parseSafeFloat(row['Other Revenue']);
             const totalRevenue = parseSafeFloat(row['Total Revenue']);
             const paidAmount = parseSafeFloat(row['Paid Amount']);
@@ -259,7 +329,12 @@ async function importBookings(filePath, groupName) {
                 telephone = EXCLUDED.telephone,
                 email = EXCLUDED.email,
                 room_unit_name = EXCLUDED.room_unit_name,
-                booking_status = EXCLUDED.booking_status,
+                -- IMMUTABLE: UNIVERSAL TERMINAL CANCELLED STATE
+                booking_status = CASE
+                  WHEN LOWER(TRIM(bookings.booking_status)) IN ('cancelled', 'canceled')
+                    THEN bookings.booking_status
+                  ELSE EXCLUDED.booking_status
+                END,
                 channel = EXCLUDED.channel,
                 currency = EXCLUDED.currency,
                 notes = EXCLUDED.notes,
@@ -353,15 +428,17 @@ async function importPayments(filePath, groupName) {
             
             // قراءة القيمة من Direct1 أو Total Paid
             const amount = paymentAmountFromRow(row, allHeaders);
+            if (!Number.isFinite(amount) || amount <= 0) continue;
 
             const currency = 'GBP';
             const paymentMethod = paymentMethodFromRow(row, allHeaders);
+            const paymentDescription = paymentDescriptionFromRow(row);
             const paymentStatus = (row['PaymentType2'] || row['Payment Status'] || 'Success').trim();
             const paymentDate = parseSafeDate(row['ReceivedDateTime'] || row['Payment Date'] || row['BookedDate']);
             const userName = String(row['UserName'] || row.User || '').trim() || 'Eviivo Import';
             const lastUpdatedDateTime = parseEviivoTimestamp(row['LastUpdatedDateTime'] || row.Updated) || paymentDate;
             const allocations = orderRef && groupRows.length > 1
-              ? await allocateGroupPayment(client, { orderReference: orderRef, amount })
+              ? await allocateGroupPayment(client, { orderReference: orderRef, amount, paymentMethod, description: paymentDescription })
               : [{ bookingReference: bookingRef, roomId: rawRoomId || bookingRef, amount }];
             if (!allocations.length) continue;
 

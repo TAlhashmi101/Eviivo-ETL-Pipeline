@@ -44,6 +44,27 @@
     .status-cancelled { background: #991b1b !important; color: #fee2e2 !important; border-color: #f87171 !important; }
     .status-parked { background: #000 !important; color: #f8fafc !important; border-color: #64748b !important; }
     .group-booking-icon { color: #a78bfa; margin-left: .25rem; }
+    .sidebar-shell { display: flex; min-height: 100vh; }
+    .sidebar { position: sticky; top: 0; height: 100vh; width: 240px; background: rgba(15,23,42,0.96); border-right: 1px solid rgba(148,163,184,0.18); display: flex; flex-direction: column; padding: 1rem 0.75rem 0.85rem; z-index: 50; transition: width 0.2s ease, padding 0.2s ease; }
+    .sidebar.collapsed { width: 84px; padding-inline: 0.5rem; }
+    .sidebar-header { display: flex; align-items: center; gap: 0.75rem; padding: 0.45rem 0.2rem 0.9rem; border-bottom: 1px solid rgba(148,163,184,0.12); }
+    .brand-mark { width: 2.2rem; height: 2.2rem; border-radius: 0.75rem; display: grid; place-items: center; background: linear-gradient(135deg, #10b981, #14b8a6); color: white; box-shadow: 0 10px 25px rgba(16,185,129,.25); }
+    .brand-copy { flex: 1; min-width: 0; }
+    .brand-title { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: white; }
+    .brand-subtitle { font-size: 0.58rem; color: #94a3b8; }
+    .sidebar-toggle { width: 2rem; height: 2rem; border-radius: 0.6rem; border: 1px solid rgba(148,163,184,0.16); background: rgba(15,23,42,0.8); color: #cbd5e1; cursor: pointer; }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 1rem; }
+    .sidebar-nav-item { display: flex; align-items: center; gap: 0.7rem; width: 100%; border: 0; background: transparent; color: #94a3b8; padding: 0.8rem 0.75rem; border-radius: 0.75rem; font-size: 0.72rem; font-weight: 700; text-align: left; cursor: pointer; transition: background 0.15s ease, color 0.15s ease; }
+    .sidebar-nav-item:hover { background: rgba(148,163,184,0.08); color: #f8fafc; }
+    .sidebar-nav-item.active { background: linear-gradient(90deg, rgba(16,185,129,0.22), rgba(16,185,129,0.06)); color: #f8fafc; border-left: 2px solid rgba(52,211,153,0.55); }
+    .sidebar-nav-icon { width: 1.1rem; display: inline-flex; justify-content: center; flex-shrink: 0; }
+    .sidebar-nav-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-footer { display: flex; flex-direction: column; gap: 0.35rem; border-top: 1px solid rgba(148,163,184,0.12); padding-top: 0.85rem; }
+    .sidebar.collapsed .brand-copy, .sidebar.collapsed .sidebar-nav-text { display: none; }
+    .sidebar.collapsed .sidebar-nav-item { justify-content: center; padding-inline: 0.35rem; }
+    .sidebar.collapsed .sidebar-header { justify-content: center; }
+    .sidebar.collapsed .sidebar-toggle { display: none; }
     table th { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     table th > * { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
     
@@ -131,7 +152,41 @@
 </head>
 
 <body class="bg-slate-50 dark:bg-[#0f172a] text-slate-800 dark:text-slate-100 min-h-screen font-sans antialiased selection:bg-emerald-500 selection:text-white relative">
-  <div id="system-activity-rail" aria-hidden="true"></div>
+  <div class="sidebar-shell">
+    <aside id="main-sidebar" class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <div class="brand-mark"><i class="fa-solid fa-hotel"></i></div>
+        <div class="brand-copy">
+          <div class="brand-title">Eviivo</div>
+          <div class="brand-subtitle">Operations Suite</div>
+        </div>
+        <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Toggle sidebar"><i class="fa-solid fa-bars"></i></button>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Primary navigation">
+        <button type="button" class="sidebar-nav-item active" data-tab="analytics"><span class="sidebar-nav-icon"><i class="fa-solid fa-chart-pie"></i></span><span class="sidebar-nav-text">Overview</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="unpaid"><span class="sidebar-nav-icon"><i class="fa-solid fa-hand-holding-dollar"></i></span><span class="sidebar-nav-text">Unpaid</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="ops"><span class="sidebar-nav-icon"><i class="fa-solid fa-bell-concierge"></i></span><span class="sidebar-nav-text">Daily Handover</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="calendar"><span class="sidebar-nav-icon"><i class="fa-solid fa-calendar-days"></i></span><span class="sidebar-nav-text">Calendar</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="reconciliation"><span class="sidebar-nav-icon"><i class="fa-solid fa-scale-balanced"></i></span><span class="sidebar-nav-text">Reconciliation</span></button>
+
+        <!-- Temporary disable - leave commented and intact -->
+        <!--
+        <button type="button" class="sidebar-nav-item" data-tab="ai-reports"><span class="sidebar-nav-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></span><span class="sidebar-nav-text">AI Reports</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="daily-tasks"><span class="sidebar-nav-icon"><i class="fa-solid fa-arrows-rotate"></i></span><span class="sidebar-nav-text">Daily Tasks</span></button>
+        -->
+      </nav>
+
+      <div class="sidebar-spacer"></div>
+
+      <div class="sidebar-footer">
+        <button type="button" class="sidebar-nav-item" title="Settings"><span class="sidebar-nav-icon"><i class="fa-solid fa-gear"></i></span><span class="sidebar-nav-text">Settings</span></button>
+        <button type="button" class="sidebar-nav-item" title="User Profile / Logout"><span class="sidebar-nav-icon"><i class="fa-solid fa-user"></i></span><span class="sidebar-nav-text">Profile</span></button>
+      </div>
+    </aside>
+
+    <div class="flex-1 min-w-0">
+      <div id="system-activity-rail" aria-hidden="true"></div>
   <div id="system-activity-chip" role="status" aria-live="polite"><span class="activity-orbit"></span><span id="system-activity-label">Updating workspace...</span></div>
 
   <!-- ===================================================================== -->
@@ -158,16 +213,6 @@
           <div id="search-dropdown-results" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-96 overflow-y-auto hidden divide-y divide-slate-800"></div>
         </div>
       </div>
-
-      <nav class="flex items-center gap-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-1 rounded-lg text-xs font-medium overflow-x-auto shadow-sm">
-        <button id="tab-btn-analytics" onclick="switchTab('analytics')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-chart-pie mr-1"></i> Overview</button>
-        <button id="tab-btn-unpaid" onclick="switchTab('unpaid')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-hand-holding-dollar mr-1 text-amber-400"></i> Unpaid</button>
-        <button id="tab-btn-ops" onclick="switchTab('ops')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-bell-concierge mr-1"></i> Daily Handover</button>
-        <button id="tab-btn-calendar" onclick="switchTab('calendar')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-calendar-days mr-1 text-indigo-400"></i> Calendar</button>
-        <button id="tab-btn-ai-reports" onclick="switchTab('ai-reports')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-wand-magic-sparkles mr-1 text-cyan-300"></i> AI Reports</button>
-        <button id="tab-btn-daily-tasks" onclick="switchTab('daily-tasks')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-arrows-rotate mr-1 text-emerald-300"></i> Daily Tasks</button>
-        <button id="tab-btn-reconciliation" onclick="switchTab('reconciliation')" class="px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap"><i class="fa-solid fa-scale-balanced mr-1 text-amber-300"></i> Reconciliation</button>
-      </nav>
 
       <div class="flex items-center gap-2">
         <button id="theme-toggle-btn" onclick="toggleTheme()" class="w-8 h-8 inline-flex items-center justify-center text-xs rounded-lg bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:bg-slate-700 dark:hover:bg-slate-100 border border-slate-700 dark:border-slate-200 transition" title="Switch to light mode" aria-label="Switch color theme">
@@ -446,7 +491,7 @@
           <span id="duplicate-guest-count" class="px-2 py-0.5 text-[10px] font-bold rounded-full bg-slate-800 text-slate-400 border border-slate-700">0 matches</span>
         </div>
         <div id="duplicate-guest-list" class="p-3">
-          <div class="text-center text-xs text-slate-500 py-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i>Checking reservations...</div>
+          <div class="text-center text-xs text-slate-500 py-3">No cross-property duplicate guest matches yet.</div>
         </div>
       </section>
 
@@ -599,6 +644,7 @@
       <div class="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-800"><button type="button" onclick="closeEditExpenseModal()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded">Cancel</button><button id="edit-expense-submit" type="submit" class="px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded">Save Changes</button></div>
       <div id="edit-expense-status" class="px-5 pb-4 text-[10px] text-rose-300" aria-live="polite"></div>
     </form>
+    </div>
   </div>
 
   <!-- ===================================================================== -->
@@ -609,13 +655,106 @@
     let globalPropertiesList = [];
     let calCurrentDate = new Date();
     let showCanceledCalendarBookings = true;
+    const APP_CACHE_KEY = 'eviivo:appstate:v1';
     const CAL_DAYS_DISPLAY = 28;
     const limit = 25;
     let currentOffset = 0;
     let unpaidOffset = 0;
     const opsTableRecords = {};
-    const appState = { bookings: [], bookingsByDate: new Map(), unpaidBookings: [] };
-    
+    const appState = { bookings: [], bookingsByDate: new Map(), unpaidBookings: [], lastSyncedAt: null, offline: false };
+    const cacheStore = {
+      read() {
+        try {
+          const raw = localStorage.getItem(APP_CACHE_KEY);
+          return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+          return null;
+        }
+      },
+      write(data) {
+        try {
+          localStorage.setItem(APP_CACHE_KEY, JSON.stringify(data));
+          return true;
+        } catch (error) {
+          return false;
+        }
+      },
+      clear() { try { localStorage.removeItem(APP_CACHE_KEY); } catch (error) {} }
+    };
+
+    function hydrateAppStateFromCache() {
+      const cache = cacheStore.read();
+      if (!cache || !Array.isArray(cache.bookings)) return false;
+      appState.bookings = Array.isArray(cache.bookings) ? cache.bookings : [];
+      appState.unpaidBookings = Array.isArray(cache.unpaidBookings) ? cache.unpaidBookings : [];
+      appState.bookingsByDate = cache.bookingsByDate instanceof Map ? cache.bookingsByDate : new Map(Array.isArray(cache.bookingsByDate) ? cache.bookingsByDate : []);
+      appState.lastSyncedAt = cache.lastSyncedAt || null;
+      appState.offline = !navigator.onLine;
+      return true;
+    }
+
+    function persistAppState() {
+      cacheStore.write({
+        bookings: appState.bookings,
+        unpaidBookings: appState.unpaidBookings,
+        bookingsByDate: Array.from(appState.bookingsByDate.entries()),
+        lastSyncedAt: Date.now(),
+        offline: !navigator.onLine
+      });
+    }
+
+    function showToast(message, type = 'success') {
+      let toast = document.getElementById('app-toast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'app-toast';
+        toast.className = 'fixed right-4 bottom-4 z-[120] min-w-[220px] max-w-[320px] rounded-xl border border-slate-700 bg-slate-900/95 text-slate-100 shadow-2xl px-3 py-2 text-[11px] opacity-0 pointer-events-none transition-all duration-200';
+        document.body.appendChild(toast);
+      }
+      const tone = type === 'warning' ? 'border-amber-500/60 text-amber-200' : type === 'error' ? 'border-rose-500/60 text-rose-200' : 'border-emerald-500/60 text-emerald-200';
+      toast.className = `fixed right-4 bottom-4 z-[120] min-w-[220px] max-w-[320px] rounded-xl border bg-slate-900/95 shadow-2xl px-3 py-2 text-[11px] opacity-100 pointer-events-auto transition-all duration-200 ${tone}`;
+      toast.innerHTML = `<div class="flex items-center gap-2"><i class="${type === 'warning' ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-check'}"></i><span>${escapeHtml(message)}</span></div>`;
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(6px)'; }, 2200);
+    }
+
+    async function fetchBookingsInBackground() {
+      try {
+        const response = await fetch('/api/bookings', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const payload = await response.json();
+        const nextBookings = Array.isArray(payload?.bookings) ? payload.bookings : Array.isArray(payload) ? payload : [];
+        const prevBookings = appState.bookings.slice();
+        appState.bookings = nextBookings;
+        appState.offline = false;
+        appState.lastSyncedAt = Date.now();
+        persistAppState();
+        const changed = nextBookings.some((booking, index) => {
+          const prev = prevBookings[index];
+          return JSON.stringify(prev) !== JSON.stringify(booking);
+        }) || nextBookings.length !== prevBookings.length;
+        if (typeof renderActiveBookingViews === 'function') renderActiveBookingViews();
+        if (typeof renderUnpaidRows === 'function') renderUnpaidRows(appState.unpaidBookings);
+        if (typeof fetchCalendarGrid === 'function') fetchCalendarGrid();
+        if (changed) showToast('Data synced successfully', 'success');
+      } catch (error) {
+        appState.offline = true;
+        persistAppState();
+        showToast('Offline: using cached data', 'warning');
+      }
+    }
+
+    function bootstrapLocalFirst() {
+      hydrateAppStateFromCache();
+      if (typeof renderActiveBookingViews === 'function') renderActiveBookingViews();
+      if (typeof renderUnpaidRows === 'function') renderUnpaidRows(appState.unpaidBookings);
+      if (navigator.onLine) {
+        fetchBookingsInBackground();
+      } else {
+        showToast('Offline: using cached data', 'warning');
+      }
+    }
+
     let searchTimer = null;
     let unpaidSearchTimer = null;
     let globalSearchTimer = null;
@@ -672,19 +811,51 @@
       const normalized = String(raw ?? '').trim().toLowerCase().replace(/[\s_-]+/g, '');
       if (normalized === 'cancelled' || normalized === 'canceled') return { key: 'cancelled', label: 'Cancelled' };
       if (normalized === 'parked') return { key: 'parked', label: 'Parked' };
-      return { key: '', label: '' };
+      return { key: 'confirmed', label: 'Confirmed' };
     }
-    function formatGroupBookingIcon(booking) {
-      if (!booking || (!String(booking.order_reference || '').trim() && (!Array.isArray(booking.group_members) || booking.group_members.length < 2))) return '';
-      return '<i class="fas fa-users group-booking-icon" title="Group booking" aria-label="Group booking"></i>';
+    function getGroupMembersForBooking(booking) {
+      const baseMembers = Array.isArray(booking?.group_members) ? booking.group_members.filter(Boolean) : [];
+      const orderReference = String(booking?.order_reference ?? booking?.orderRef ?? '').trim();
+      const uniqueByRef = new Map();
+
+      const addUnique = (candidate) => {
+        if (!candidate || typeof candidate !== 'object') return;
+        const candidateRef = String(candidate.booking_reference || '').trim();
+        if (!candidateRef) return;
+        if (!uniqueByRef.has(candidateRef)) uniqueByRef.set(candidateRef, candidate);
+      };
+
+      baseMembers.forEach(addUnique);
+      if (orderReference) {
+        const candidates = [...(appState.bookings || []), ...(appState.unpaidBookings || [])];
+        candidates.forEach(candidate => {
+          const candidateOrder = String(candidate?.order_reference ?? candidate?.orderRef ?? '').trim();
+          if (candidateOrder && candidateOrder === orderReference) addUnique(candidate);
+        });
+      }
+
+      const members = [...uniqueByRef.values()];
+      if (!orderReference && members.length < 2) return [];
+      return members.filter(member => String(member.booking_reference || '') !== String(booking?.booking_reference || '') || members.length > 1);
+    }
+    function hasGroupBooking(booking) {
+      if (!booking) return false;
+      const groupMembers = getGroupMembersForBooking(booking);
+      return groupMembers.length > 1 || (!!String(booking.order_reference || '').trim() && groupMembers.length > 0);
+    }
+    function formatGroupBookingIcon(booking, extraClass = 'group-booking-icon') {
+      if (!hasGroupBooking(booking)) return '';
+      return `<i class="fas fa-users ${extraClass}" title="Group booking" aria-label="Group booking"></i>`;
     }
     function formatBookingStatusBadge(status) {
       const statusInfo = normalizeBookingStatus(status);
-      if (!statusInfo.key) return '';
+      if (statusInfo.key === 'confirmed') return '';
       return `<span class="inline-flex items-center ml-1 px-1.5 py-0.5 rounded border text-[8px] font-bold align-middle status-${statusInfo.key}">${statusInfo.label}</span>`;
     }
     function formatGuestNameWithStatus(name, status) {
-      return `${escapeHtml(name || 'Guest')}${formatBookingStatusBadge(status)}`;
+      const booking = status && typeof status === 'object' ? status : { booking_status: status };
+      const groupIcon = formatGroupBookingIcon(booking, 'ml-1 group-booking-icon');
+      return `${escapeHtml(name || 'Guest')}${groupIcon}${formatBookingStatusBadge(booking)}`;
     }
     const compactHeaderLabel = value => {
       const label = String(value ?? '').replace(/[_/]+/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -723,8 +894,51 @@
       });
     }
 
+    function paymentStateKey(payment) {
+      return String(payment?.unique_payment_key || payment?.ledger_id || `${payment?.source || ''}:${payment?.payment_id || payment?.imported_id || ''}`);
+    }
+
+    function syncBookingPaymentState(ref, payments) {
+      const cleanPayments = (Array.isArray(payments) ? payments : []).map(payment => ({ ...payment }));
+      const activePayments = cleanPayments.filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true');
+      const totalPaid = activePayments.reduce((sum, payment) => sum + cleanPaymentAmount(payment?.amount), 0);
+      const totalBilled = bookingCardTotalState.get(ref) || 0;
+      const balance = totalBilled - totalPaid;
+      bookingCardPaymentState.set(ref, cleanPayments);
+      updateLocalBookingState(ref, {
+        payment_history: cleanPayments,
+        paid_amount: totalPaid,
+        total_paid_amount: totalPaid,
+        total_paid: totalPaid,
+        paid: totalPaid,
+        balance_due: balance,
+        balance,
+        due_now: Math.max(0, balance)
+      });
+      persistAppState();
+      updateBookingCardSummary(totalBilled, cleanPayments, ref);
+      renderUnpaidRows(appState.unpaidBookings);
+      renderOpsTable('ops-arrivals-tbody', opsTableRecords['ops-arrivals-tbody'] || []);
+      renderOpsTable('ops-departures-tbody', opsTableRecords['ops-departures-tbody'] || []);
+      renderActiveBookingViews();
+    }
+
+    function renderLocalPaymentHistory(ref) {
+      const body = document.getElementById(`payment-history-body-${ref}`);
+      if (!body) return;
+      const payments = (bookingCardPaymentState.get(ref) || []).filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true');
+      body.innerHTML = payments.length ? payments.map(payment => {
+        const amount = cleanPaymentAmount(payment.amount);
+        const source = payment.source || 'manual';
+        const paymentId = source === 'imported' ? payment.imported_id : payment.payment_id;
+        const key = escapeHtml(paymentStateKey(payment));
+        return `<tr data-payment-key="${key}" class="hover:bg-slate-800/60 border-b border-slate-800/50 transition"><td class="p-2 font-mono text-[10px] text-slate-400">${escapeHtml(String(payment.payment_date || '').split('T')[0])}</td><td class="p-2 font-bold ${amount < 0 ? 'text-rose-300' : 'text-emerald-300'}">${escapeHtml(payment.payment_method || 'Payment')}</td><td class="p-2 text-slate-400 max-w-[180px]">${escapeHtml(payment.description || 'Record')}</td><td class="p-2 text-right font-bold ${amount < 0 ? 'text-rose-300' : 'text-emerald-300'}">${amount < 0 ? '-' : '+'}${fmt(Math.abs(amount))}</td><td class="p-2 text-center"><button onclick="event.stopPropagation(); removePaymentRecord('${ref}', '${source}', '${paymentId}')" class="text-slate-500 hover:text-rose-300 transition" title="Delete payment"><i class="fa-solid fa-trash-can"></i></button></td></tr>`;
+      }).join('') : '<tr><td colspan="5" class="p-4 text-center text-slate-500 italic">No historical records found.</td></tr>';
+    }
+
     function renderActiveBookingViews() {
       if (activeTab === 'ops') {
+        renderDuplicateGuestWatch(buildCrossPropertyGuestGroups());
         renderOpsTable('ops-arrivals-tbody', opsTableRecords['ops-arrivals-tbody'] || []);
         renderOpsTable('ops-departures-tbody', opsTableRecords['ops-departures-tbody'] || []);
         const arrivals = opsTableRecords['ops-arrivals-tbody'] || [];
@@ -743,7 +957,6 @@
         setElText('unpaid-summary-outstanding', fmt(visibleUnpaid.reduce((sum, booking) => sum + Number(booking.balance_due || 0), 0)));
         setElText('unpaid-summary-booked', fmt(visibleUnpaid.reduce((sum, booking) => sum + Number(booking.booked_amount || 0), 0)));
       }
-      if (activeTab === 'calendar') fetchCalendarGrid();
     }
 
     class SmartTableFilter {
@@ -922,6 +1135,19 @@
       applyTheme(document.documentElement.classList.contains('light-mode') ? 'dark' : 'light');
     }
 
+    document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
+      document.getElementById('main-sidebar')?.classList.toggle('collapsed');
+    });
+    document.querySelectorAll('[data-tab]').forEach(button => {
+      button.addEventListener('click', () => {
+        const tab = button.dataset.tab;
+        document.querySelectorAll('[data-tab]').forEach(item => item.classList.toggle('active', item === button));
+        if (typeof switchTab === 'function') switchTab(tab);
+      });
+    });
+
+    bootstrapLocalFirst();
+
     // --- ESCAPE KEY LISTENER ---
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
@@ -949,23 +1175,40 @@
     // --- TABS & REFRESH LOGIC ---
     function switchTab(tab) {
       activeTab = tab;
-      ['analytics', 'unpaid', 'ops', 'cal', 'ai-reports', 'daily-tasks', 'reconciliation'].forEach(t => {
-        const c = document.getElementById(`tab-content-${t}`);
-        const b = document.getElementById(`tab-btn-${t === 'cal' ? 'calendar' : t}`);
-        if(c) c.classList.add('hidden');
-        if(b) b.className = 'px-3 py-1.5 rounded-md text-slate-400 hover:text-white transition whitespace-nowrap';
-      });
-      document.getElementById(`tab-content-${tab === 'calendar' ? 'cal' : tab}`).classList.remove('hidden');
-      const btnMap = { 'analytics': 'bg-emerald-600', 'unpaid': 'bg-amber-600', 'ops': 'bg-emerald-600', 'calendar': 'bg-indigo-600', 'ai-reports': 'bg-cyan-600', 'daily-tasks': 'bg-emerald-600', 'reconciliation': 'bg-amber-600' };
-      document.getElementById(`tab-btn-${tab}`).className = `px-3 py-1.5 rounded-md text-white font-semibold transition whitespace-nowrap ${btnMap[tab]}`;
+      const tabMap = { analytics: 'analytics', unpaid: 'unpaid', ops: 'ops', calendar: 'cal', reconciliation: 'reconciliation' };
 
-      if (tab === 'analytics') loadAllAnalytics();
-      if (tab === 'unpaid') fetchUnpaidReservations(unpaidOffset);
-      if (tab === 'ops') fetchDailyOps();
-      if (tab === 'calendar') fetchCalendarGrid();
-      if (tab === 'ai-reports' && !currentAiReport.rows.length) runAiReport();
-      if (tab === 'daily-tasks') loadTaskWorkspace();
-      if (tab === 'reconciliation') loadMonthEndReconciliation();
+      Object.keys(tabMap).forEach(key => {
+        const content = document.getElementById(`tab-content-${tabMap[key]}`);
+        const button = document.getElementById(`tab-btn-${key}`);
+        if (content) content.classList.add('hidden');
+        if (button) {
+          button.classList.remove('active', 'bg-emerald-600', 'bg-amber-600', 'bg-indigo-600', 'text-white');
+          button.classList.add('text-slate-400');
+        }
+      });
+
+      const targetContent = document.getElementById(`tab-content-${tabMap[tab] || tab}`);
+      const targetButton = document.getElementById(`tab-btn-${tab}`);
+      if (targetContent) targetContent.classList.remove('hidden');
+      if (targetButton) {
+        targetButton.classList.add('active');
+        const priority = tab === 'analytics' ? 'bg-emerald-600' : tab === 'unpaid' ? 'bg-amber-600' : tab === 'calendar' ? 'bg-indigo-600' : 'bg-emerald-600';
+        targetButton.classList.remove('text-slate-400');
+        targetButton.classList.add(priority, 'text-white');
+      }
+
+      if (tab === 'analytics' && typeof loadAllAnalytics === 'function') {
+        loadAllAnalytics();
+      }
+      if (tab === 'unpaid' && typeof renderUnpaidRows === 'function') {
+        renderUnpaidRows(appState.unpaidBookings || []);
+      }
+      if (tab === 'ops' && typeof renderActiveBookingViews === 'function') {
+        renderActiveBookingViews();
+      }
+      if (tab === 'reconciliation' && typeof renderReconciliationTable === 'function') {
+        renderReconciliationTable();
+      }
     }
 
     async function triggerFullSystemRefresh() {
@@ -1462,10 +1705,10 @@
     function applyBookingStatusState(header, status) {
       if (!header) return;
       const statusInfo = normalizeBookingStatus(status);
-      header.classList.remove('booking-modal-header-cancelled', 'booking-modal-header-noshow', 'bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
+      header.classList.remove('booking-modal-header-cancelled', 'booking-modal-header-parked', 'bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
       header.classList.add('bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
       if (statusInfo.key === 'cancelled') header.classList.add('booking-modal-header-cancelled');
-      if (statusInfo.key === 'noshow') header.classList.add('booking-modal-header-noshow');
+      if (statusInfo.key === 'parked') header.classList.add('booking-modal-header-parked');
     }
 
     async function openUniversalModal(encodedData) {
@@ -1502,31 +1745,34 @@
       const roomUnitRevenue = [b.room_unit_revenue, rawData['Room/Unit Revenue'], rawData['room_unit_revenue'], rawData.room_rate, rawData['Room Rate']]
         .map(value => parseFloat(value))
         .find(Number.isFinite);
-      const totalBilled = cleanPaymentAmount(b.net_total ?? (Number.isFinite(roomUnitRevenue) ? roomUnitRevenue : b.booked_amount || 0));
+      const totalBilled = cleanPaymentAmount(Number.isFinite(roomUnitRevenue) ? roomUnitRevenue : (b.booked_amount ?? b.total_revenue ?? 0));
       bookingCardTotalState.set(ref, totalBilled);
       const otherRevenue = parseFloat(b.other_revenue ?? rawData['Other Revenue'] ?? rawData.other_revenue ?? 0) || 0;
       const paymentsSum = paymentHistory.filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true').reduce((sum, payment) => sum + cleanPaymentAmount(payment?.amount), 0);
       let balance = totalBilled - paymentsSum;
-      const groupMembers = Array.isArray(b.group_members) ? b.group_members : [];
-      const groupHeaderHtml = groupMembers.length > 1 ? `
+      const groupMembers = getGroupMembersForBooking(b);
+      const groupOptionsByReference = new Map();
+      [b, ...groupMembers].forEach(booking => {
+        const bookingReference = String(booking?.booking_reference || '').trim();
+        if (bookingReference && !groupOptionsByReference.has(bookingReference)) groupOptionsByReference.set(bookingReference, booking);
+      });
+      const groupOptions = [...groupOptionsByReference.values()];
+      const groupHeaderHtml = groupOptions.length > 1 ? `
         <div class="flex items-center gap-2">
-          <span class="inline-flex items-center gap-1 text-indigo-300 text-[10px] font-semibold whitespace-nowrap" title="${b.total_group_guests || 0} guests in group">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-            ${b.total_group_guests || 0} Guests
+          <span class="inline-flex items-center gap-1 text-indigo-300 text-[10px] font-semibold whitespace-nowrap" title="${groupOptions.length} rooms in group">
+            <i class="fas fa-users"></i>
+            ${groupOptions.length} Rooms
           </span>
-          <details class="relative text-left">
-            <summary class="list-none cursor-pointer rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-slate-300 hover:border-indigo-400">
-              <span class="flex flex-col text-left"><span class="text-xs text-slate-400">Ref: ${escapeHtml(ref)}</span><span class="text-sm font-semibold truncate max-w-[180px]">${escapeHtml(guestFirstName)} ${escapeHtml(guestLastName)}</span></span>
-            </summary>
-            <div class="absolute right-0 z-30 mt-1 w-72 rounded-lg border border-slate-600 bg-slate-900 p-1 shadow-xl">
-              ${groupMembers.map(member => {
-                const memberName = [member.guest_first_name, member.guest_last_name].filter(Boolean).join(' ') || member.guest_name || 'Guest';
-                const memberStatusInfo = normalizeBookingStatus(member);
-                const memberSuffix = memberStatusInfo.label ? ` (${memberStatusInfo.label})` : '';
-                return `<button type="button" onclick="openUniversalModal('${encodeBookingData(member)}')" class="block w-full rounded px-2 py-2 text-left hover:bg-slate-800"><span class="block text-[10px] font-bold ${memberStatusInfo.key === 'cancelled' ? 'text-rose-300' : memberStatusInfo.key === 'noshow' ? 'text-orange-300' : 'text-white'}">${escapeHtml(member.booking_reference)} ${escapeHtml(memberName)}${memberSuffix}</span><span class="block text-[9px] text-slate-400">${Number(member.adults || 0)} Adult, ${escapeHtml(member.room_unit_name || '-')}</span></button>`;
-              }).join('')}
-            </div>
-          </details>
+          <select class="bg-slate-900 border border-slate-600 rounded px-2 py-1 text-[10px] text-slate-200 focus:outline-none" onchange="const selected = this.value; if (selected) openUniversalModal(selected);">
+            ${groupOptions.map(member => {
+              const memberReference = String(member.booking_reference || '').trim();
+              const memberName = [member.guest_first_name, member.guest_last_name].filter(Boolean).join(' ') || member.guest_name || 'Guest';
+              const memberStatusInfo = normalizeBookingStatus(member);
+              const memberSuffix = memberStatusInfo.key === 'confirmed' ? '' : ` (${memberStatusInfo.label})`;
+              const selectedAttribute = memberReference === String(ref) ? ' selected' : '';
+              return `<option value="${encodeBookingData(member)}"${selectedAttribute}>${escapeHtml(memberReference || 'Booking')} · ${escapeHtml(memberName)}${memberSuffix}</option>`;
+            }).join('')}
+          </select>
         </div>` : `<div class="flex items-center"><button type="button" class="rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-left"><span class="flex flex-col"><span class="text-xs text-slate-400">Ref: ${escapeHtml(ref)}</span><span class="text-sm font-semibold truncate max-w-[180px]">${escapeHtml(guestFirstName)} ${escapeHtml(guestLastName)}</span></span></button></div>`;
       const cancellationRevenue = totalBilled;
       const waivedDeposit = Math.min(otherRevenue, Math.max(0, Math.abs(parseFloat(b.total_deposit_waivers || 0))));
@@ -1568,9 +1814,10 @@
       const cardsHtml = cardHistory.length ? cardHistory.map(card => `<div class="flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-slate-950/60"><div><div class="font-bold text-white">${card.card_brand || 'Payment card'} ending ${card.last_four || '----'}</div><div class="text-[10px] text-slate-400">${card.cardholder_name} · Expires ${card.expiry_month || '--'}/${card.expiry_year || '----'}</div></div><button onclick="removePanelCard('${ref}', ${card.card_id})" class="text-slate-500 hover:text-rose-300" title="Delete card"><i class="fa-solid fa-trash-can"></i></button></div>`).join('') : '<div class="text-center text-slate-500 py-6">No stored cards.</div>';
       const commsHtml = messageHistory.length ? messageHistory.map(message => `<div class="p-3 border-b border-slate-800"><div class="flex justify-between text-[10px] text-slate-500"><span>${message.message_type}</span><span>${message.created_at ? message.created_at.split('T')[0] : ''}</span></div><div class="text-xs text-slate-200 mt-1">${message.message_text}</div><button onclick="removePanelMessage('${ref}', ${message.message_id})" class="text-[10px] text-rose-300 mt-2">Delete</button></div>`).join('') : '<div class="text-center text-slate-500 py-6">No communications recorded.</div>';
 
+      const modalStatusSuffix = bookingStatusInfo.key === 'cancelled' ? ' (Cancelled)' : bookingStatusInfo.key === 'parked' ? ' (Parked)' : '';
       panel.innerHTML = `
         <div data-booking-modal-header class="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 px-4 py-3 flex justify-between items-start w-full gap-4 shrink-0">
-          <div class="min-w-0 flex flex-col flex-1"><h2 class="text-sm font-bold text-white truncate max-w-[200px]">${escapeHtml(b.room_unit_name || 'Room')}${bookingStatusInfo.label ? ` (${bookingStatusInfo.label})` : ''}</h2><div class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i class="fa-solid fa-hotel text-indigo-400"></i><span class="truncate">${escapeHtml(b.property_name || 'Hotel')}</span></div></div>
+          <div class="min-w-0 flex flex-col flex-1"><h2 class="text-sm font-bold text-white truncate max-w-[200px]">${escapeHtml(b.room_unit_name || 'Room')}${modalStatusSuffix}</h2><div class="text-[10px] text-slate-500 mt-1 flex items-center gap-1"><i class="fa-solid fa-hotel text-indigo-400"></i><span class="truncate">${escapeHtml(b.property_name || 'Hotel')}</span></div></div>
           <div class="flex flex-col items-end gap-2 shrink-0"><div class="max-w-[250px] truncate">${guestTag ? `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 px-2 py-0.5 text-[9px] font-bold max-w-[250px] truncate">${escapeHtml(guestTag)}<i class="fa-solid fa-xmark text-[8px] shrink-0"></i></span>` : ''}</div><div class="flex items-center gap-2">${groupHeaderHtml}<button onclick="closeUniversalPanel('${ref}')" class="text-slate-400 hover:text-white text-xl transition" aria-label="Close booking"><i class="fa-solid fa-xmark"></i></button></div></div>
         </div>
 
@@ -1617,7 +1864,7 @@
           <div id="tab-payments-${ref}" class="hidden space-y-3 flex flex-col h-full min-h-0">
             <div class="bg-slate-950/50 border border-slate-800 rounded-lg overflow-hidden w-full flex-1 flex flex-col min-h-[220px]">
               <div class="px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between"><span class="font-bold text-[10px] text-slate-200 uppercase tracking-wide"><i class="fa-solid fa-list-check mr-1 text-indigo-400"></i> Complete payment ledger</span><span class="text-[9px] text-slate-500">Imported records are read-only</span></div>
-              <div class="overflow-y-auto overflow-x-auto flex-1 h-full"><table class="w-full text-left text-[11px] min-w-[560px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase sticky top-0 z-10"><tr><th class="p-2">DATE</th><th class="p-2">METHOD</th><th class="p-2">DESC</th><th class="p-2 text-right">AMOUNT</th><th class="p-2 text-center">AUDIT</th></tr></thead><tbody class="divide-y divide-slate-800 text-slate-300">${historyHtml}</tbody></table></div>
+              <div class="overflow-y-auto overflow-x-auto flex-1 h-full"><table class="w-full text-left text-[11px] min-w-[560px]"><thead class="bg-slate-950 text-slate-500 text-[9px] uppercase sticky top-0 z-10"><tr><th class="p-2">DATE</th><th class="p-2">METHOD</th><th class="p-2">DESC</th><th class="p-2 text-right">AMOUNT</th><th class="p-2 text-center">AUDIT</th></tr></thead><tbody id="payment-history-body-${ref}" class="divide-y divide-slate-800 text-slate-300">${historyHtml}</tbody></table></div>
             </div>
             <div class="border border-slate-700 bg-slate-900 rounded-lg p-3 w-full shrink-0">
               <div class="font-bold text-[10px] text-emerald-400 mb-2 uppercase"><i class="fa-solid fa-plus-circle mr-1"></i> New Record</div>
@@ -1825,11 +2072,12 @@
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ amount: amt, description: desc, payment_method: method, card_brand: brand, card_last_four: last4 })
         });
-        await completeModalMutation(ref, response, 'Unable to save payment record.', result => {
-          const payments = bookingCardPaymentState.get(ref) || [];
-          if (result.payment) payments.push(result.payment);
-          bookingCardPaymentState.set(ref, payments);
-        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to save payment record.');
+        const payments = [...(bookingCardPaymentState.get(ref) || [])];
+        if (result.payment) payments.push({ ...result.payment, source: 'manual' });
+        syncBookingPaymentState(ref, payments);
+        renderLocalPaymentHistory(ref);
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -1936,13 +2184,14 @@
       try {
         const endpoint = source === 'imported' ? `/api/payments/imported/${paymentId}` : `/api/payments/${paymentId}`;
         const response = await fetch(endpoint, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, payment_method: method, description, user_name: 'Portal User' }) });
-        await completeModalMutation(ref, response, 'Unable to edit payment record.', result => {
-          const payments = bookingCardPaymentState.get(ref) || [];
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to edit payment record.');
+        const payments = (bookingCardPaymentState.get(ref) || []).map(payment => {
           const id = source === 'imported' ? 'imported_id' : 'payment_id';
-          const index = payments.findIndex(payment => String(payment[id]) === String(paymentId));
-          if (index >= 0 && result.payment) payments[index] = { ...payments[index], ...result.payment };
-          bookingCardPaymentState.set(ref, payments);
+          return String(payment[id]) === String(paymentId) && result.payment ? { ...payment, ...result.payment } : payment;
         });
+        syncBookingPaymentState(ref, payments);
+        renderLocalPaymentHistory(ref);
       } catch (error) { alert(`Error: ${error.message}`); }
     }
 
@@ -1951,11 +2200,14 @@
       try {
         const endpoint = source === 'imported' ? `/api/payments/imported/${encodeURIComponent(paymentId)}` : `/api/payments/${encodeURIComponent(paymentId)}`;
         const response = await fetch(endpoint, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_name: 'Portal User' }) });
-        await completeModalMutation(ref, response, 'Unable to remove payment record.', () => {
-          const payments = bookingCardPaymentState.get(ref) || [];
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to remove payment record.');
+        const payments = (bookingCardPaymentState.get(ref) || []).map(payment => {
           const id = source === 'imported' ? 'imported_id' : 'payment_id';
-          bookingCardPaymentState.set(ref, payments.map(payment => String(payment[id]) === String(paymentId) ? { ...payment, is_deleted: true } : payment));
+          return String(payment[id]) === String(paymentId) ? { ...payment, is_deleted: true } : payment;
         });
+        syncBookingPaymentState(ref, payments);
+        renderLocalPaymentHistory(ref);
       } catch(e) { alert('Error: ' + e.message); }
     }
 
@@ -2062,11 +2314,7 @@
         });
         appState.bookingsByDate.set(date, cachedBookings);
         appState.bookings = [...cachedBookings.values()];
-        window.setTimeout(() => {
-          const snapshot = appState.bookings.slice();
-          const groups = buildCrossPropertyGuestGroups(snapshot);
-          renderDuplicateGuestWatch(groups);
-        }, 0);
+        renderDuplicateGuestWatch(buildCrossPropertyGuestGroups(date));
         const totalDue = arr.reduce((acc, row) => acc + Math.max(0, parseFloat(row.balance_due || 0)), 0);
 
         setElText('cliq-total-arrivals', arr.length);
@@ -2094,12 +2342,23 @@
       } catch (e) {}
     }
 
-    function buildCrossPropertyGuestGroups(bookings) {
+    function normalizeCrossPropertyGuestName(name) {
+      return String(name || '')
+        .toLowerCase()
+        .replace(/[^a-z ]/g, '')
+        .split(' ')
+        .filter(Boolean)
+        .sort()
+        .join(' ');
+    }
+
+    function buildCrossPropertyGuestGroups(selectedDate = document.getElementById('ops-date')?.value || '') {
       const groups = new Map();
-      bookings.forEach(booking => {
+      const dateBookings = (appState.bookings || []).filter(booking => String(booking.check_in || '').slice(0, 10) === selectedDate);
+      dateBookings.forEach(booking => {
         if (['canceled', 'cancelled'].includes(String(booking.booking_status || '').trim().toLowerCase())) return;
         const guestName = String(booking.guest_name || `${booking.guest_first_name || ''} ${booking.guest_last_name || ''}`).trim();
-        const guestKey = guestName.toLowerCase().replace(/\s+/g, ' ');
+        const guestKey = normalizeCrossPropertyGuestName(guestName);
         const propertyName = String(booking.property_name || '').trim();
         if (!guestKey || !propertyName || guestKey === 'guest') return;
         if (!groups.has(guestKey)) groups.set(guestKey, { guest_name: guestName, reservations: [], properties: new Set() });
@@ -2108,7 +2367,7 @@
         group.properties.add(propertyName.toLowerCase());
       });
       return [...groups.values()]
-        .filter(group => group.properties.size > 1)
+        .filter(group => group.reservations.length > 1 && group.properties.size > 1)
         .map(group => ({ guest_name: group.guest_name, property_count: group.properties.size, reservations: group.reservations }));
     }
 
@@ -2314,13 +2573,14 @@
 
             const bgClass = isCanceled
               ? `bg-rose-950/80 text-rose-200 border-rose-500/80 ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`
-              : `${calendarStatus.key === 'noshow' ? 'status-noshow' : 'bg-orange-500 text-orange-950 border-orange-600'} ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`;
+              : `bg-orange-500 text-orange-950 border-orange-600 ${isOverlap ? 'bg-striped hover-lift mt-5' : 'hover:brightness-110'}`;
             const enc = encodeBookingData(bk);
             const statusIcon = isCanceled ? '<i class="fa-solid fa-ban mr-1 text-rose-300" title="Canceled reservation"></i>' : '';
-            const statusIconHtml = calendarStatus.key === 'noshow' ? '<i class="fa-solid fa-triangle-exclamation mr-1 text-orange-200" title="No show"></i>' : statusIcon;
+            const statusIconHtml = statusIcon;
+            const groupIconHtml = formatGroupBookingIcon(bk, 'mr-1');
             const statusLabel = calendarStatus.label ? `${calendarStatus.label} - click to edit` : `Open ${bk.guest_name || 'reservation'}`;
             
-            html += `<div onclick="event.stopPropagation(); openUniversalModal('${enc}')" title="${statusLabel}" style="left: ${start*130 + 3}px; width: ${w - 6}px; top: 6px;" class="calendar-booking absolute h-9 rounded border px-1.5 py-0.5 text-[10px] cursor-pointer shadow-md flex items-center justify-between overflow-hidden transition-all ${bgClass} ${isOverlap ? 'is-overlap' : ''}"><div class="truncate font-bold flex items-center">${statusIconHtml}${otaIcon} ${formatGuestNameWithStatus(bk.guest_name, bk)} ${noteIconHtml}</div><div class="text-[9px] shrink-0">${calendarStatus.label ? `<span class="font-bold">${calendarStatus.label.toUpperCase()}</span>` : icons}</div></div>`;
+            html += `<div onclick="event.stopPropagation(); openUniversalModal('${enc}')" title="${statusLabel}" style="left: ${start*130 + 3}px; width: ${w - 6}px; top: 6px;" class="calendar-booking absolute h-9 rounded border px-1.5 py-0.5 text-[10px] cursor-pointer shadow-md flex items-center justify-between overflow-hidden transition-all ${bgClass} ${isOverlap ? 'is-overlap' : ''}"><div class="truncate font-bold flex items-center">${groupIconHtml}${statusIconHtml}${otaIcon} ${escapeHtml(bk.guest_name || 'Guest')} ${noteIconHtml}</div><div class="text-[9px] shrink-0">${calendarStatus.key === 'confirmed' ? icons : `<span class="font-bold">${calendarStatus.label.toUpperCase()}</span>`}</div></div>`;
           });
           html += `</div></div>`;
         });

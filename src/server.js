@@ -273,9 +273,9 @@ const RECORDED_PAID_SQL = `(
   WHERE rp.booking_reference = b.booking_reference
     AND rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount')
 )`;
-const NET_TOTAL_SQL = `COALESCE(b.total_revenue::numeric, 0)
-  + COALESCE((SELECT SUM(c.amount) FROM reservation_charges c WHERE c.booking_reference = b.booking_reference), 0)
-  + COALESCE((SELECT SUM(rp.amount) FROM reservation_payments rp WHERE rp.booking_reference = b.booking_reference AND rp.payment_method IN ('Waive/Discount', 'Deposit Waive/Discount')), 0)`;
+// Core booking totals exclude other_revenue, which is reserved for independent
+// damage-deposit metadata and must never inflate room revenue or balance due.
+const NET_TOTAL_SQL = `COALESCE(b.total_revenue::numeric, 0)`;
 const APPLIED_PAID_SQL = `LEAST((${RECORDED_PAID_SQL}), (${NET_TOTAL_SQL}))`;
 const NET_BALANCE_SQL = `(${NET_TOTAL_SQL}) - (${APPLIED_PAID_SQL})`;
 function netBalanceFor() { return NET_BALANCE_SQL; }
