@@ -151,7 +151,16 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
       DROP INDEX IF EXISTS payments_payment_id_unique;
       DROP INDEX IF EXISTS payments_identity_idx;
       ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_identity;
+      DELETE FROM payments older
+      USING payments newer
+      WHERE older.payment_id = newer.payment_id
+        AND older.booking_reference IS NOT DISTINCT FROM newer.booking_reference
+        AND (older.last_updated_date_time, older.id) < (newer.last_updated_date_time, newer.id);
+      CREATE UNIQUE INDEX IF NOT EXISTS payments_payment_booking_unique_idx
+        ON payments(payment_id, booking_reference);
       CREATE UNIQUE INDEX IF NOT EXISTS payments_unique_payment_key_idx ON payments(unique_payment_key);
+      CREATE INDEX IF NOT EXISTS idx_imported_payments_booking_ref
+        ON payments(booking_reference) WHERE is_deleted = FALSE;
       UPDATE payments SET payment_date = received_date_time WHERE payment_date IS NULL AND received_date_time IS NOT NULL;
       UPDATE payments SET received_date_time = payment_date WHERE received_date_time IS NULL AND payment_date IS NOT NULL;
       CREATE TABLE IF NOT EXISTS task_mapping_presets (
@@ -240,46 +249,88 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // [CORE-LOGIC]: GROUP PAYMENTS DISTRIBUTION ENGINE
 // ============================================================================
 const DISTRIBUTED_CTE = `
-  WITH group_aggregates AS (
+  WITH payment_totals AS (
+    SELECT p.booking_reference,
+           SUM(COALESCE(p.amount::numeric, 0)) AS imported_paid
+    FROM payments p
+    WHERE p.is_deleted = FALSE
+      AND LOWER(TRIM(COALESCE(p.payment_status, ''))) !~ '(fail|declin|cancel|void|pending|reject|unpaid|error)'
+      AND LOWER(TRIM(COALESCE(p.payment_method, ''))) !~ '^on account'
+      AND LOWER(TRIM(COALESCE(p.payment_status, ''))) !~ '^on account'
+    GROUP BY p.booking_reference
+  ),
+  manual_payment_totals AS (
+    SELECT rp.booking_reference,
+           SUM(COALESCE(rp.amount::numeric, 0)) AS manual_paid
+    FROM reservation_payments rp
+    WHERE rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount')
+    GROUP BY rp.booking_reference
+  ),
+  booking_payments AS (
+    SELECT b.booking_reference, COALESCE(pt.imported_paid, 0) + COALESCE(mt.manual_paid, 0) AS actual_paid_amount
+    FROM bookings b
+    LEFT JOIN payment_totals pt
+      ON pt.booking_reference = b.booking_reference
+    LEFT JOIN manual_payment_totals mt
+      ON mt.booking_reference = b.booking_reference
+  ),
+  group_aggregates AS (
     SELECT order_reference,
            SUM(COALESCE(total_revenue::numeric, 0)) AS group_total_booked,
-           SUM(COALESCE(paid_amount::numeric, 0)) AS group_total_paid,
+           SUM(COALESCE(bp.actual_paid_amount, 0)) AS group_total_paid,
            COUNT(*) AS group_total_rooms
     FROM bookings
+    LEFT JOIN booking_payments bp USING (booking_reference)
     WHERE order_reference IS NOT NULL AND TRIM(order_reference) != ''
       AND NOT (LOWER(TRIM(COALESCE(booking_status, ''))) IN ('canceled', 'cancelled')
-        AND COALESCE(total_revenue, 0) = 0 AND COALESCE(paid_amount, 0) = 0)
+        AND COALESCE(total_revenue, 0) = 0 AND COALESCE(bp.actual_paid_amount, 0) = 0)
     GROUP BY order_reference
   ),
   distributed_bookings AS (
     SELECT b.*,
            COALESCE(ga.group_total_rooms, 1) AS group_total_rooms,
-           CASE 
-             WHEN COALESCE(ga.group_total_rooms, 1) > 1 AND COALESCE(ga.group_total_booked, COALESCE(b.total_revenue::numeric, 0)) > 0 THEN 
-               ROUND((COALESCE(b.total_revenue::numeric, 0) * (COALESCE(ga.group_total_paid, COALESCE(b.paid_amount::numeric, 0)) / ga.group_total_booked))::numeric, 2)
-             ELSE COALESCE(b.paid_amount::numeric, 0)
+           COALESCE(bp.actual_paid_amount, 0) AS actual_paid_amount,
+           CASE
+             WHEN COALESCE(ga.group_total_rooms, 1) > 1 AND COALESCE(ga.group_total_booked, 0) > 0 THEN
+               ROUND((
+                 ga.group_total_paid
+                 * SUM(COALESCE(b.total_revenue::numeric, 0)) OVER (
+                   PARTITION BY b.order_reference
+                   ORDER BY b.booking_reference, b.id
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                 ) / ga.group_total_booked
+               )::numeric, 2)
+               - ROUND((
+                 ga.group_total_paid
+                 * (SUM(COALESCE(b.total_revenue::numeric, 0)) OVER (
+                   PARTITION BY b.order_reference
+                   ORDER BY b.booking_reference, b.id
+                   ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                 ) - COALESCE(b.total_revenue::numeric, 0)) / ga.group_total_booked
+               )::numeric, 2)
+             ELSE COALESCE(bp.actual_paid_amount, 0)
            END AS distributed_paid_amount
     FROM bookings b
+    LEFT JOIN booking_payments bp USING (booking_reference)
     LEFT JOIN group_aggregates ga ON b.order_reference = ga.order_reference
     WHERE NOT (LOWER(TRIM(COALESCE(b.booking_status, ''))) IN ('canceled', 'cancelled')
-      AND COALESCE(b.total_revenue, 0) = 0 AND COALESCE(b.paid_amount, 0) = 0)
+      AND COALESCE(b.total_revenue, 0) = 0 AND COALESCE(bp.actual_paid_amount, 0) = 0)
   )
 `;
 
 const RECORDED_PAID_SQL = `(
-  SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_reference = b.booking_reference AND p.is_deleted = FALSE
-) + (
-  SELECT COALESCE(SUM(rp.amount), 0) FROM reservation_payments rp
-  WHERE rp.booking_reference = b.booking_reference
-    AND rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount')
+  b.distributed_paid_amount
 )`;
 // Core booking totals exclude other_revenue, which is reserved for independent
 // damage-deposit metadata and must never inflate room revenue or balance due.
 const NET_TOTAL_SQL = `COALESCE(b.total_revenue::numeric, 0)`;
-const APPLIED_PAID_SQL = `LEAST((${RECORDED_PAID_SQL}), (${NET_TOTAL_SQL}))`;
+const APPLIED_PAID_SQL = RECORDED_PAID_SQL;
 const NET_BALANCE_SQL = `(${NET_TOTAL_SQL}) - (${APPLIED_PAID_SQL})`;
 function netBalanceFor() { return NET_BALANCE_SQL; }
-const PAYMENT_AMOUNT_SQL = `COALESCE(NULLIF(regexp_replace(COALESCE(p.direct1, ''), '[^0-9.-]', '', 'g'), '')::numeric, p.amount, 0)`;
+const PAYMENT_AMOUNT_SQL = `COALESCE(p.amount::numeric, 0)`;
+const VERIFIED_PAYMENT_FILTER = `LOWER(TRIM(COALESCE(p.payment_status, ''))) !~ '(fail|declin|cancel|void|pending|reject|unpaid|error)'
+  AND LOWER(TRIM(COALESCE(p.payment_method, ''))) !~ '^on account'
+  AND LOWER(TRIM(COALESCE(p.payment_status, ''))) !~ '^on account'`;
 const PAYMENT_DATE_SQL = 'CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE)';
 
 const sharedSelectSQL = `
@@ -320,83 +371,24 @@ const sharedSelectSQL = `
   (SELECT COALESCE(json_agg(message ORDER BY created_at DESC), '[]'::json) FROM booking_messages message WHERE message.booking_reference = b.booking_reference) AS message_history
 `;
 
-const bookingDetailSelectSQL = sharedSelectSQL
-  .replace('b.distributed_paid_amount::numeric AS total_paid_amount,', `
-    ${APPLIED_PAID_SQL} AS total_paid_amount,`)
-  .replace('ROUND((b.total_revenue::numeric - b.distributed_paid_amount)::numeric, 2) AS balance_due,', `
-    ROUND((b.total_revenue::numeric - (
-      (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_reference = b.booking_reference AND p.is_deleted = FALSE)
-      + (SELECT COALESCE(SUM(rp.amount), 0) FROM reservation_payments rp WHERE rp.booking_reference = b.booking_reference AND rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount'))
-    ))::numeric, 2) AS balance_due,`);
-
-function bookingGroupKey(booking) {
-  return String(booking.raw_data?.Group ?? booking.raw_data?.group ?? '').trim()
-    || String(booking.order_reference || '').trim();
-}
-
-async function applyGroupPaymentWaterfall(bookings) {
-  const groupKeys = [...new Set(bookings.map(bookingGroupKey).filter(Boolean))];
-    if (!groupKeys.length) return { rows: bookings, groups: new Map(), allocatedByReference: new Map() };
-
-  const groupResult = await pool.query(`
-    ${DISTRIBUTED_CTE}
-    SELECT b.booking_reference, b.order_reference, b.guest_first_name, b.guest_last_name,
-           CONCAT_WS(' ', b.guest_first_name, b.guest_last_name) AS guest_name,
-           b.adults, b.children, b.room_unit_name, b.property_name, b.raw_data,
-           b.total_revenue::numeric AS booked_amount,
-           (SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.booking_reference = b.booking_reference AND p.is_deleted = FALSE)
-             + (SELECT COALESCE(SUM(rp.amount), 0) FROM reservation_payments rp WHERE rp.booking_reference = b.booking_reference AND rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount')) AS recorded_paid_amount
-    FROM distributed_bookings b
-    WHERE COALESCE(NULLIF(TRIM(b.raw_data->>'Group'), ''), NULLIF(TRIM(b.order_reference), '')) = ANY($1::text[])
-    ORDER BY COALESCE(NULLIF(TRIM(b.raw_data->>'Group'), ''), NULLIF(TRIM(b.order_reference), '')), b.booking_reference;
-  `, [groupKeys]);
-
-  const groups = new Map();
-  groupResult.rows.forEach(member => {
-    const key = bookingGroupKey(member);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(member);
-  });
-
-  const allocatedByReference = new Map();
-  groups.forEach(members => {
-    let remainingPaid = members.reduce((total, member) => total + Number(member.recorded_paid_amount || 0), 0);
-    members.forEach(member => {
-      const revenue = Math.max(0, Number(member.booked_amount || 0));
-      const allocatedPaid = Math.min(Math.max(0, remainingPaid), revenue);
-      allocatedByReference.set(member.booking_reference, allocatedPaid);
-      remainingPaid -= allocatedPaid;
-    });
-  });
-
-  const rows = bookings.map(booking => {
-    const allocatedPaid = allocatedByReference.get(booking.booking_reference);
-    if (allocatedPaid === undefined) return booking;
-    return {
-      ...booking,
-      total_paid_amount: allocatedPaid,
-      balance_due: Number(booking.booked_amount || booking.total_revenue || 0) - allocatedPaid
-    };
-  });
-  return { rows, groups, allocatedByReference };
-}
-
-function groupMembersWithAllocation(members, allocatedByReference) {
-  return members.map(member => {
-    const allocatedPaid = allocatedByReference.get(member.booking_reference) || 0;
-    return {
-      ...member,
-      total_paid_amount: allocatedPaid,
-      balance_due: Number(member.booked_amount || 0) - allocatedPaid
-    };
-  });
-}
+const bookingDetailSelectSQL = sharedSelectSQL;
 
 async function recalculateBookingPaidAmount(client, bookingReference) {
   await client.query(`
     UPDATE bookings b
-    SET paid_amount = COALESCE((SELECT SUM(p.amount) FROM payments p WHERE p.booking_reference = b.booking_reference AND p.is_deleted = FALSE), 0)
-      + COALESCE((SELECT SUM(rp.amount) FROM reservation_payments rp WHERE rp.booking_reference = b.booking_reference), 0)
+    SET paid_amount = COALESCE((
+      SELECT SUM(p.amount)
+      FROM payments p
+      WHERE p.booking_reference = b.booking_reference
+        AND p.is_deleted = FALSE
+        AND ${VERIFIED_PAYMENT_FILTER}
+    ), 0)
+      + COALESCE((
+        SELECT SUM(rp.amount)
+        FROM reservation_payments rp
+        WHERE rp.booking_reference = b.booking_reference
+          AND rp.payment_method NOT IN ('Waive/Discount', 'Deposit Waive/Discount')
+      ), 0)
     WHERE b.booking_reference = $1;
   `, [bookingReference]);
 }
@@ -547,7 +539,8 @@ app.get('/api/reconciliation-summary', async (req, res) => {
     const [cashResult, expenseResult, expensesResult, settlementResult] = await Promise.all([
       pool.query(`SELECT ROUND(COALESCE(SUM(${PAYMENT_AMOUNT_SQL}), 0)::numeric, 2) AS expected_cash
         FROM payments p
-        WHERE p.is_deleted = FALSE AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'
+        WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER}
+          AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'
           AND TO_CHAR(CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE), 'YYYY-MM') = $1
           ${propertyFilter};`, params),
       pool.query(`SELECT ROUND(COALESCE(SUM(e.amount), 0)::numeric, 2) AS total_expenses
@@ -584,7 +577,8 @@ app.get('/api/reconciliation-ledger', async (req, res) => {
              p.payment_method
       FROM payments p
       LEFT JOIN bookings b ON b.booking_reference = p.booking_reference
-      WHERE p.is_deleted = FALSE AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'
+      WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER}
+        AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'
         AND TO_CHAR(CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE), 'YYYY-MM') = $1
         ${propertyFilter}
       ORDER BY CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE), p.id;
@@ -605,7 +599,7 @@ app.post('/api/settlements/lock', async (req, res) => {
     const existing = await client.query('SELECT is_locked FROM monthly_settlements WHERE LOWER(property_name) = LOWER($1) AND settlement_month = $2 FOR UPDATE', [property, month]);
     if (existing.rows[0]?.is_locked) throw new Error('This month is already locked for the selected property.');
     const params = [month, property];
-    const cashResult = await client.query(`SELECT ROUND(COALESCE(SUM(${PAYMENT_AMOUNT_SQL}), 0)::numeric, 2) AS expected_cash FROM payments p WHERE p.is_deleted = FALSE AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%' AND TO_CHAR(CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE), 'YYYY-MM') = $1 AND LOWER(TRIM(COALESCE(NULLIF(p.business_name, ''), p.property_name))) = LOWER(TRIM($2));`, params);
+    const cashResult = await client.query(`SELECT ROUND(COALESCE(SUM(${PAYMENT_AMOUNT_SQL}), 0)::numeric, 2) AS expected_cash FROM payments p WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%' AND TO_CHAR(CAST(COALESCE(p.received_date_time, p.payment_date) AS DATE), 'YYYY-MM') = $1 AND LOWER(TRIM(COALESCE(NULLIF(p.business_name, ''), p.property_name))) = LOWER(TRIM($2));`, params);
     const expenseResult = await client.query(`SELECT ROUND(COALESCE(SUM(amount), 0)::numeric, 2) AS total_expenses FROM petty_expenses WHERE TO_CHAR(expense_date, 'YYYY-MM') = $1 AND LOWER(TRIM(property_name)) = LOWER(TRIM($2));`, params);
     const expectedCash = Number(Number(cashResult.rows[0].expected_cash || 0).toFixed(2));
     const totalExpenses = Number(Number(expenseResult.rows[0].total_expenses || 0).toFixed(2));
@@ -687,13 +681,13 @@ app.get('/api/kpis', async (req, res) => {
       pool.query(`${DISTRIBUTED_CTE} SELECT COUNT(*)::int AS count, COALESCE(SUM(b.total_revenue::numeric - b.distributed_paid_amount), 0)::numeric AS value FROM distributed_bookings b WHERE b.check_out < CURRENT_DATE AND (b.total_revenue::numeric - b.distributed_paid_amount) > 0 ${excludeCanceled ? "AND LOWER(TRIM(COALESCE(b.booking_status, ''))) NOT IN ('canceled', 'cancelled')" : ''} ${property && property !== 'ALL' ? 'AND TRIM(b.property_name) ILIKE $1' : ''} ${dateScope};`, params),
       pool.query(`SELECT COALESCE(SUM(${PAYMENT_AMOUNT_SQL}), 0)::numeric AS value
         FROM payments p
-        WHERE p.is_deleted = FALSE AND ${PAYMENT_DATE_SQL} IS NOT NULL
+        WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND ${PAYMENT_DATE_SQL} IS NOT NULL
           AND ${PAYMENT_AMOUNT_SQL} > 0
           ${paymentDateScope}
           ${cashProperty} ${cashMethod};`, cashParams),
       pool.query(`SELECT DISTINCT TRIM(p.payment_method) AS payment_method
         FROM payments p
-        WHERE p.is_deleted = FALSE AND ${PAYMENT_DATE_SQL} IS NOT NULL
+        WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND ${PAYMENT_DATE_SQL} IS NOT NULL
           AND ${PAYMENT_AMOUNT_SQL} > 0
           ${paymentDateScope.replaceAll('p.', 'p.')}
           ${property && property !== 'ALL' ? 'AND TRIM(p.business_name) ILIKE $1' : ''}
@@ -721,11 +715,11 @@ app.get('/api/reports/settled-cash', async (req, res) => {
               p.payment_method, ${PAYMENT_AMOUNT_SQL}::numeric AS amount,
               COALESCE(NULLIF(p.raw_data->>'Description', ''), NULLIF(p.raw_data->>'Payment Description', ''), NULLIF(p.payment_type, ''), p.payment_method, 'Payment') AS description
             FROM payments p
-            WHERE p.is_deleted = FALSE AND ${filters.join(' AND ')}
+            WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND ${filters.join(' AND ')}
          AND ${PAYMENT_AMOUNT_SQL} > 0
             ORDER BY ${PAYMENT_DATE_SQL} DESC, p.id DESC;
     `, params);
-    const methodsResult = await pool.query(`SELECT DISTINCT TRIM(p.payment_method) AS payment_method FROM payments p WHERE p.is_deleted = FALSE AND ${filters.slice(0, 2).join(' AND ')} ${property && property !== 'ALL' ? 'AND TRIM(p.business_name) ILIKE $3' : ''} AND NULLIF(TRIM(p.payment_method), '') IS NOT NULL ORDER BY 1;`, property && property !== 'ALL' ? [fromDate, toDate, property] : [fromDate, toDate]);
+    const methodsResult = await pool.query(`SELECT DISTINCT TRIM(p.payment_method) AS payment_method FROM payments p WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND ${filters.slice(0, 2).join(' AND ')} ${property && property !== 'ALL' ? 'AND TRIM(p.business_name) ILIKE $3' : ''} AND NULLIF(TRIM(p.payment_method), '') IS NOT NULL ORDER BY 1;`, property && property !== 'ALL' ? [fromDate, toDate, property] : [fromDate, toDate]);
     res.json({ from_date: fromDate, to_date: toDate, transactions: result.rows, total: result.rows.reduce((sum, row) => sum + Number(row.amount || 0), 0), payment_methods: methodsResult.rows.map(row => row.payment_method) });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -818,7 +812,7 @@ function buildAiReport(type, query) {
     const method = normalized === 'cash' ? "LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'" : normalized === 'card' ? "(LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%card%' OR LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%visa%' OR LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%mastercard%')" : 'TRUE';
     const filters = reportFilters(query, 'COALESCE(p.payment_date, p.received_date_time)');
     const where = filters.sql ? `${filters.sql} AND ${method}` : `WHERE ${method}`;
-    return { type: normalized, meta: AI_REPORTS[normalized], sql: `SELECT p.unique_payment_key AS "Unique Payment Key", p.payment_id AS "Payment ID", p.booking_reference AS "Booking Reference", COALESCE(p.property_name, b.property_name, 'Unknown') AS "Hotel", COALESCE(p.payment_date, p.received_date_time)::DATE AS "Payment Date", p.payment_method AS "Payment Method", p.payment_type AS "Payment Type", p.amount::NUMERIC AS "Amount", COALESCE(p.guest_name, CONCAT_WS(' ', b.guest_first_name, b.guest_last_name)) AS "Guest" FROM payments p LEFT JOIN bookings b ON b.booking_reference = p.booking_reference ${where.replace('WHERE ', 'WHERE p.is_deleted = FALSE AND ')} ORDER BY COALESCE(p.payment_date, p.received_date_time) DESC NULLS LAST, p.unique_payment_key`, params: filters.params };
+    return { type: normalized, meta: AI_REPORTS[normalized], sql: `SELECT p.unique_payment_key AS "Unique Payment Key", p.payment_id AS "Payment ID", p.booking_reference AS "Booking Reference", COALESCE(p.property_name, b.property_name, 'Unknown') AS "Hotel", COALESCE(p.payment_date, p.received_date_time)::DATE AS "Payment Date", p.payment_method AS "Payment Method", p.payment_type AS "Payment Type", p.amount::NUMERIC AS "Amount", COALESCE(p.guest_name, CONCAT_WS(' ', b.guest_first_name, b.guest_last_name)) AS "Guest" FROM payments p LEFT JOIN bookings b ON b.booking_reference = p.booking_reference ${where.replace('WHERE ', `WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND `)} ORDER BY COALESCE(p.payment_date, p.received_date_time) DESC NULLS LAST, p.unique_payment_key`, params: filters.params };
   }
   if (normalized === 'daily_sales') {
     const filters = reportFilters(query, 'b.check_in');
@@ -911,7 +905,7 @@ function taskSourceQuery(type, body) {
   }
   const method = task.method === 'cash' ? "LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%cash%'" : "(LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%card%' OR LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%visa%' OR LOWER(TRIM(COALESCE(p.payment_method, ''))) LIKE '%mastercard%')";
   clauses.push(`COALESCE(p.payment_date, p.received_date_time)::DATE = $1::DATE`, method);
-  return { sql: `SELECT p.* FROM payments p LEFT JOIN bookings b ON b.booking_reference = p.booking_reference WHERE p.is_deleted = FALSE AND ${clauses.join(' AND ')} ORDER BY p.payment_date DESC NULLS LAST, p.payment_id`, params };
+  return { sql: `SELECT p.* FROM payments p LEFT JOIN bookings b ON b.booking_reference = p.booking_reference WHERE p.is_deleted = FALSE AND ${VERIFIED_PAYMENT_FILTER} AND ${clauses.join(' AND ')} ORDER BY p.payment_date DESC NULLS LAST, p.payment_id`, params };
 }
 
 function validateMapping(mapping, sourceColumns) {
@@ -1068,9 +1062,10 @@ app.post('/api/reconciliation', async (req, res) => {
     });
 
     const dbResult = await pool.query(`
+            ${DISTRIBUTED_CTE}
             SELECT b.*,
-              check_in::DATE AS check_in,
-              check_out::DATE AS check_out,
+              b.check_in::DATE AS check_in,
+              b.check_out::DATE AS check_out,
               CONCAT_WS(' ', guest_first_name, guest_last_name) AS guest_name,
               telephone AS guest_phone,
               email AS guest_email,
@@ -1087,6 +1082,7 @@ app.post('/api/reconciliation', async (req, res) => {
               COALESCE(NULLIF(TRIM(booking_notes), ''), NULLIF(TRIM(notes), '')) AS booking_notes,
               total_revenue AS total_price,
               total_revenue AS booked_amount,
+              b.distributed_paid_amount AS actual_paid_amount,
               COALESCE(
                 (SELECT STRING_AGG(method, ', ' ORDER BY method)
                  FROM (
@@ -1094,6 +1090,7 @@ app.post('/api/reconciliation', async (req, res) => {
                    FROM payments p
                    WHERE REGEXP_REPLACE(UPPER(TRIM(p.booking_reference)), '\\s+', '', 'g') = REGEXP_REPLACE(UPPER(TRIM(b.booking_reference)), '\\s+', '', 'g')
                      AND p.is_deleted = FALSE
+                     AND ${VERIFIED_PAYMENT_FILTER}
                      AND COALESCE(p.amount, 0) > 0
                      AND NULLIF(TRIM(p.payment_method), '') IS NOT NULL
                  ) positive_payment_methods),
@@ -1105,40 +1102,26 @@ app.post('/api/reconciliation', async (req, res) => {
               ) AS payment_methods,
               property_name,
               room_unit_name
-      FROM bookings AS b
-      WHERE check_in::DATE >= $1::DATE AND check_in::DATE <= $2::DATE
+      FROM distributed_bookings AS b
+      WHERE b.check_in::DATE >= $1::DATE AND b.check_in::DATE <= $2::DATE
         ${hasPropertyFilter ? 'AND REGEXP_REPLACE(LOWER(COALESCE(property_name, \'\')), \'\\s+\', \'\', \'g\') = $3' : ''}
-      ORDER BY check_in, booking_reference;
+      ORDER BY b.check_in, b.booking_reference;
     `, hasPropertyFilter ? [startDate, endDate, normalizedPropertyFilter] : [startDate, endDate]);
 
     const dbRows = dbResult.rows.map(dbRecord => {
       const roomRate = parseFloat(dbRecord.room_unit_revenue || dbRecord.room_rate || dbRecord.raw_data?.room_unit_revenue || dbRecord.raw_data?.room_rate || dbRecord.raw_data?.price_per_night || 0) || 0;
       const otherRev = parseFloat(dbRecord.other_revenue || 0) || 0;
       const total = parseFloat(dbRecord.total_revenue || 0) || 0;
-      const paid = parseFloat(dbRecord.paid_amount || 0) || 0;
-      const source = String(dbRecord.booking_source || '').toLowerCase().trim();
-      let paymentStatus = '';
-      let appendedNote = '';
-
-      if (paid === 0 || total === 0 || source === 'direct') {
-        paymentStatus = 'Payment on arrival';
-      } else if (paid >= roomRate) {
-        paymentStatus = 'Pre-paid';
-        if (otherRev > 0) appendedNote = paid >= total ? ' | ✅ Other revenue paid' : ' | 🔴 Other revenue not paid';
-      } else if (paid > 0 && paid < roomRate) {
-        paymentStatus = 'Payment on arrival';
-        appendedNote = ' | ⚠️ Room rate partially paid';
-      }
-
+      const paid = parseFloat(dbRecord.actual_paid_amount || 0) || 0;
+      const paymentStatus = paid <= 0
+        ? 'Unpaid'
+        : paid < total
+          ? 'Partially Paid'
+          : paid > total
+            ? 'Overpaid'
+            : 'Paid';
       const originalNote = String(dbRecord.notes || dbRecord.booking_notes || '').trim();
-      const cleanAppendedNote = appendedNote.replace(/^\s*\|\s*/, '').trim();
-      const finalNote = cleanAppendedNote
-        ? (originalNote ? `${cleanAppendedNote} | ${originalNote}` : cleanAppendedNote)
-        : originalNote;
-      const prepaidOta = /(expedia\s*collect|booking\.com\s*vcc|booking\s*vcc|virtual\s*card|prepaid)/i.test(source);
-      const paymentMethod = paid >= roomRate
-        ? String(dbRecord.payment_methods || (prepaidOta && paymentStatus === 'Pre-paid' ? 'Pre-paid' : '')).trim()
-        : '';
+      const paymentMethod = paid > 0 ? String(dbRecord.payment_methods || '').trim() : '';
       return {
         ...dbRecord,
         check_in: normalizeDateOnly(dbRecord.check_in),
@@ -1147,7 +1130,7 @@ app.post('/api/reconciliation', async (req, res) => {
         other_revenue: otherRev,
         payment_status: paymentStatus,
         payment_method: paymentMethod,
-        booking_notes: finalNote
+        booking_notes: originalNote
       };
     });
     const missingInSheet = dbRows.filter(dbRecord => {
@@ -1238,23 +1221,31 @@ app.get('/api/bookings/:ref', async (req, res) => {
     if (!result.rows.length) return res.status(404).json({ error: 'Booking not found.' });
 
     const booking = result.rows[0];
-    const allocation = await applyGroupPaymentWaterfall([booking]);
-    const groupKey = bookingGroupKey(booking);
-    const groupMembers = allocation.groups.get(groupKey);
-    if (groupMembers && groupMembers.length > 1) {
+    const groupResult = booking.order_reference
+      ? await pool.query(`
+          ${DISTRIBUTED_CTE}
+          SELECT ${bookingDetailSelectSQL},
+                 COALESCE(b.adults, 0) + COALESCE(b.children, 0) AS group_guest_count
+          FROM distributed_bookings b
+          WHERE b.order_reference = $1
+          ORDER BY b.booking_reference, b.id;
+        `, [booking.order_reference])
+      : { rows: [] };
+    if (groupResult.rows.length > 1) {
+      const groupMembers = groupResult.rows;
       const totalGroupGuests = groupMembers.reduce(
-        (total, member) => total + Number(member.adults || 0) + Number(member.children || 0),
+        (total, member) => total + Number(member.group_guest_count || 0),
         0
       );
       return res.json({
-        ...allocation.rows[0],
-        group_members: groupMembersWithAllocation(groupMembers, allocation.allocatedByReference),
-        total_group_paid: groupMembers.reduce((total, member) => total + Number(member.recorded_paid_amount || 0), 0),
+        ...booking,
+        group_members: groupMembers,
+        total_group_paid: groupMembers.reduce((total, member) => total + Number(member.total_paid_amount || 0), 0),
         total_group_guests: totalGroupGuests
       });
     }
 
-    res.json(allocation.rows[0]);
+    res.json(booking);
   } catch (err) {
     console.error('Booking detail error:', err.message);
     res.status(500).json({ error: err.message });
@@ -1296,13 +1287,11 @@ app.get('/api/operations/daily', async (req, res) => {
     const properties = String(property || '').split(',').map(value => value.trim()).filter(value => value && value !== 'ALL');
     if (properties.length) { queryParams.push(properties); propertyCondition = `AND TRIM(b.property_name) ILIKE ANY($2::TEXT[])`; }
 
-    const baseQuery = (dateCol) => `${DISTRIBUTED_CTE} SELECT ${sharedSelectSQL}, CASE WHEN b.distributed_paid_amount <= 0 THEN 'Payment on Arrival / Unpaid' WHEN b.distributed_paid_amount < b.total_revenue::numeric THEN 'Partially Paid' ELSE 'Fully Prepaid' END AS payment_status FROM distributed_bookings b WHERE b.${dateCol}::DATE = $1::DATE ${propertyCondition} AND LOWER(TRIM(COALESCE(b.booking_status, ''))) NOT IN ('canceled', 'cancelled') ORDER BY b.room_unit_name ASC, b.check_in ASC;`;
+    const baseQuery = (dateCol) => `${DISTRIBUTED_CTE} SELECT ${sharedSelectSQL}, CASE WHEN b.distributed_paid_amount <= 0 THEN 'Unpaid' WHEN b.distributed_paid_amount < b.total_revenue::numeric THEN 'Partially Paid' WHEN b.distributed_paid_amount > b.total_revenue::numeric THEN 'Overpaid' ELSE 'Paid' END AS payment_status FROM distributed_bookings b WHERE b.${dateCol}::DATE = $1::DATE ${propertyCondition} AND LOWER(TRIM(COALESCE(b.booking_status, ''))) NOT IN ('canceled', 'cancelled') ORDER BY b.room_unit_name ASC, b.check_in ASC;`;
     const [arrRes, depRes] = await Promise.all([pool.query(baseQuery('check_in'), queryParams), pool.query(baseQuery('check_out'), queryParams)]);
-    const allocation = await applyGroupPaymentWaterfall([...arrRes.rows, ...depRes.rows]);
-    const allocatedRows = new Map(allocation.rows.map(row => [row.booking_reference, row]));
     res.json({
-      arrivals: arrRes.rows.map(row => allocatedRows.get(row.booking_reference) || row),
-      departures: depRes.rows.map(row => allocatedRows.get(row.booking_reference) || row)
+      arrivals: arrRes.rows,
+      departures: depRes.rows
     });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -82,7 +82,16 @@ END $$;
 DROP INDEX IF EXISTS payments_payment_id_key;
 DROP INDEX IF EXISTS payments_payment_id_unique;
 DROP INDEX IF EXISTS payments_identity_idx;
+DELETE FROM payments older
+USING payments newer
+WHERE older.payment_id = newer.payment_id
+  AND older.booking_reference IS NOT DISTINCT FROM newer.booking_reference
+  AND (older.last_updated_date_time, older.id) < (newer.last_updated_date_time, newer.id);
+CREATE UNIQUE INDEX IF NOT EXISTS payments_payment_booking_unique_idx
+    ON payments(payment_id, booking_reference);
 CREATE UNIQUE INDEX IF NOT EXISTS payments_unique_payment_key_idx ON payments(unique_payment_key);
+CREATE INDEX IF NOT EXISTS idx_imported_payments_booking_ref
+    ON payments(booking_reference) WHERE is_deleted = FALSE;
 
 CREATE TABLE IF NOT EXISTS reservation_payments (
     payment_id SERIAL PRIMARY KEY,
