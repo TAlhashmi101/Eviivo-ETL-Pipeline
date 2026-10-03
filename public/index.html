@@ -310,7 +310,7 @@
         </div>
       </section>
       <section class="bg-slate-900 border border-cyan-500/30 rounded-xl p-4 shadow-xl">
-        <div class="flex flex-wrap items-center justify-between gap-2"><div><div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider"><i class="fa-solid fa-list-check mr-1"></i>Detailed Cash Ledger</div><h2 class="text-lg font-bold text-white mt-1">Filtered Period Transactions</h2><p class="text-[10px] text-slate-500 mt-1">Every cash payment contributing to Total System Cash.</p></div><span id="cash-ledger-count" class="text-[10px] text-slate-400">0 transactions</span></div>
+        <div class="flex flex-wrap items-center justify-between gap-2"><div><div class="text-[10px] font-bold text-cyan-300 uppercase tracking-wider"><i class="fa-solid fa-list-check mr-1"></i>Detailed Cash Ledger</div><h2 class="text-lg font-bold text-white mt-1">Filtered Period Transactions</h2><p class="text-[10px] text-slate-500 mt-1">Every cash payment contributing to Total System Cash.</p></div><div class="text-right"><div class="text-sm font-bold text-emerald-300">Period total: <span id="cash-ledger-total">£0.00</span></div><div id="cash-ledger-count" class="text-[10px] text-slate-400">0 of 0 transactions</div></div></div>
         <div class="overflow-x-auto mt-4"><table id="cash-ledger-table" class="w-full text-left text-[11px] text-slate-300 table-compact"><thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800"><tr><th>DATE</th><th>REF</th><th>ROOM</th><th>GUEST</th><th>METHOD</th><th class="text-right">AMOUNT</th></tr></thead><tbody id="cash-ledger-body"><tr><td colspan="6" class="p-5 text-center text-slate-500">Select a property and month to load cash transactions.</td></tr></tbody></table></div>
       </section>
       <section class="bg-slate-900 border border-amber-500/30 rounded-xl p-4 shadow-xl">
@@ -1040,7 +1040,7 @@
         this.states.set(columnIndex, new Set(current));
         if (!this.availableValues) this.availableValues = new Map();
         this.availableValues.set(columnIndex, new Set(values));
-        dropdown.innerHTML = `<div class="flex items-center gap-1 pb-2 border-b border-gray-600"><button type="button" data-sort="asc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↑</span>Sort A to Z</button><button type="button" data-sort="desc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↓</span>Sort Z to A</button></div><div class="relative mt-2"><svg viewBox="0 0 20 20" fill="currentColor" class="absolute left-2 top-2 w-3 h-3 text-slate-400"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 1 0 3.48 9.76l3.63 3.63 1.06-1.06-3.63-3.63A5.5 5.5 0 0 0 8.5 3Zm0 1.5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" clip-rule="evenodd"/></svg><input data-search type="search" placeholder="Search values" class="w-full bg-gray-900 border border-gray-600 rounded px-7 py-1.5 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"></div><div class="flex items-center justify-between py-2 text-[10px]"><button type="button" data-select-all class="text-cyan-300 hover:text-cyan-200">Select all</button><button type="button" data-clear-all class="text-amber-300 hover:text-amber-200">Clear</button></div><div data-values class="max-h-48 overflow-y-auto border-y border-gray-700 py-1"></div><div class="flex items-center justify-end gap-2 pt-2"><button type="button" data-cancel class="px-3 py-1.5 text-[10px] rounded border border-gray-600 hover:bg-gray-700">Cancel</button><button type="button" data-ok class="px-3 py-1.5 text-[10px] rounded bg-amber-600 hover:bg-amber-500 font-semibold">OK</button></div>`;
+        dropdown.innerHTML = `<div class="flex items-center gap-1 pb-2 border-b border-gray-600"><button type="button" data-sort="asc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↑</span>Sort A to Z</button><button type="button" data-sort="desc" class="flex-1 px-2 py-1.5 text-[10px] rounded hover:bg-gray-700 text-left"><span class="mr-1">↓</span>Sort Z to A</button></div><div class="relative mt-2"><svg viewBox="0 0 20 20" fill="currentColor" class="absolute left-2 top-2 w-3 h-3 text-slate-400"><path fill-rule="evenodd" d="M8.5 3a5.5 5.5 0 1 0 3.48 9.76l3.63 3.63 1.06-1.06-3.63-3.63A5.5 5.5 0 0 0 8.5 3Zm0 1.5a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z" clip-rule="evenodd"/></svg><input data-search type="search" placeholder="Search values" class="w-full bg-gray-900 border border-gray-600 rounded px-7 py-1.5 text-[10px] text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"></div><div class="flex items-center justify-between py-2 text-[10px]"><button type="button" data-select-all class="text-cyan-300 hover:text-cyan-200">Select all</button><button type="button" data-clear-all class="text-amber-300 hover:text-amber-200">Reset filter</button></div><div data-values class="max-h-48 overflow-y-auto border-y border-gray-700 py-1"></div><div class="flex items-center justify-end gap-2 pt-2"><button type="button" data-cancel class="px-3 py-1.5 text-[10px] rounded border border-gray-600 hover:bg-gray-700">Cancel</button><button type="button" data-ok class="px-3 py-1.5 text-[10px] rounded bg-amber-600 hover:bg-amber-500 font-semibold">OK</button></div>`;
         const valueBox = dropdown.querySelector('[data-values]');
         const renderValues = search => {
           const query = search.toLowerCase();
@@ -1050,7 +1050,7 @@
         dropdown.querySelector('[data-search]').addEventListener('input', event => renderValues(event.target.value));
         dropdown.querySelector('[data-values]').addEventListener('change', event => { if (event.target.matches('input')) { if (event.target.checked) current.add(event.target.value); else current.delete(event.target.value); } });
         dropdown.querySelector('[data-select-all]').addEventListener('click', () => { values.forEach(value => current.add(value)); renderValues(dropdown.querySelector('[data-search]').value); });
-        dropdown.querySelector('[data-clear-all]').addEventListener('click', () => { current.clear(); renderValues(dropdown.querySelector('[data-search]').value); });
+        dropdown.querySelector('[data-clear-all]').addEventListener('click', () => { values.forEach(value => current.add(value)); renderValues(dropdown.querySelector('[data-search]').value); });
         dropdown.querySelector('[data-sort="asc"]').addEventListener('click', () => { this.sort(columnIndex, 1); dropdown.remove(); this.activeDropdown = null; });
         dropdown.querySelector('[data-sort="desc"]').addEventListener('click', () => { this.sort(columnIndex, -1); dropdown.remove(); this.activeDropdown = null; });
         dropdown.querySelector('[data-cancel]').addEventListener('click', () => { dropdown.remove(); this.activeDropdown = null; });
@@ -1064,9 +1064,10 @@
 
       applyFilters() {
         this.getRows().forEach(row => {
-          const visible = [...this.states.entries()].every(([columnIndex, allowed]) => allowed.size === 0 ? false : allowed.has(this.cellValue(row, columnIndex)));
+          const visible = [...this.states.entries()].every(([columnIndex, allowed]) => allowed.has(this.cellValue(row, columnIndex)));
           row.classList.toggle('hidden', !visible);
         });
+        this.table._onSmartFilterChange?.();
       }
     }
 
@@ -1403,14 +1404,22 @@
 
     function renderCashLedger(transactions) {
       const body = document.getElementById('cash-ledger-body');
-      setElText('cash-ledger-count', `${transactions.length} transaction${transactions.length === 1 ? '' : 's'}`);
+      const table = document.getElementById('cash-ledger-table');
+      const updateVisibleCount = () => {
+        const rows = Array.from(body.querySelectorAll('tr')).filter(row => !row.querySelector('td[colspan]'));
+        const visibleCount = rows.filter(row => !row.classList.contains('hidden')).length;
+        setElText('cash-ledger-count', `${visibleCount} of ${transactions.length} transaction${transactions.length === 1 ? '' : 's'}`);
+      };
       body.innerHTML = transactions.length ? transactions.map(transaction => {
         const booking = { booking_reference: transaction.booking_reference || '', room_unit_name: transaction.room_name || '', guest_name: transaction.guest_name || '' };
         const encoded = encodeBookingData(booking);
         const date = transaction.received_date_time ? String(transaction.received_date_time).slice(0, 10) : '-';
         return `<tr class="cursor-pointer border-b border-slate-800 hover:bg-slate-800/70 transition" onclick="openUniversalModal('${encoded}')" title="Open booking card"><td>${escapeHtml(date)}</td><td class="font-mono text-emerald-300">${escapeHtml(transaction.booking_reference || '-')}</td><td>${escapeHtml(transaction.room_name || '-')}</td><td>${formatGuestNameWithStatus(transaction.guest_name || '-', transaction)}</td><td class="text-cyan-300">${escapeHtml(transaction.payment_method || '-')}</td><td class="text-right text-emerald-300 font-semibold">${fmt(transaction.amount)}</td></tr>`;
       }).join('') : '<tr><td colspan="6" class="p-5 text-center text-slate-500">No cash transactions found for this property and month.</td></tr>';
+      setElText('cash-ledger-total', fmt(transactions.reduce((total, transaction) => total + Number(transaction.amount || 0), 0)));
+      if (table) table._onSmartFilterChange = updateVisibleCount;
       applyUniversalColumnFilters('#cash-ledger-table');
+      updateVisibleCount();
     }
 
     function setMonthEndLocked(settlement) {
@@ -1713,10 +1722,26 @@
 
     async function openUniversalModal(encodedData) {
       const seedBooking = JSON.parse(decodeURIComponent(encodedData));
+      const ref = String(seedBooking.booking_reference || '').trim();
+      if (!ref) return showToast('This transaction does not have a booking reference.', 'warning');
+      if (document.getElementById(`panel-${ref}`)) return;
+
       const cachedBooking = appState.bookings.find(booking => String(booking.booking_reference || '') === String(seedBooking.booking_reference || ''))
         || appState.unpaidBookings.find(booking => String(booking.booking_reference || '') === String(seedBooking.booking_reference || ''));
-      const b = cachedBooking ? { ...seedBooking, ...cachedBooking } : seedBooking;
-      const ref = b.booking_reference;
+      let bookingReportData = {};
+      try {
+        const response = await fetch(`/api/bookings/${encodeURIComponent(ref)}`, { cache: 'no-store' });
+        if (response.ok) {
+          bookingReportData = await response.json();
+        } else if (response.status !== 404) {
+          const result = await response.json().catch(() => ({}));
+          throw new Error(result.error || 'Unable to load booking details.');
+        }
+      } catch (error) {
+        showToast(error.message || 'Unable to load booking details.', 'error');
+        return;
+      }
+      const b = { ...seedBooking, ...(cachedBooking || {}), ...bookingReportData };
       const bookingNotes = b.notes ?? b.booking_notes ?? b.custom_notes ?? '';
       const bookingStatus = String(b.booking_status || b.status || 'Confirmed').trim() || 'Confirmed';
       const bookingStatusInfo = normalizeBookingStatus(bookingStatus);
@@ -1732,7 +1757,7 @@
       const checkInStatus = arrivalStatus || (['checked in', 'in house'].includes(bookingStatus.toLowerCase()) ? bookingStatus : 'Not Checked In');
       
       const container = document.getElementById('multi-panel-container');
-      if(document.getElementById(`panel-${ref}`)) return; // Already open
+      if(document.getElementById(`panel-${ref}`)) return; // Another click opened it while details loaded.
 
       const panel = document.createElement('div');
       panel.id = `panel-${ref}`;
