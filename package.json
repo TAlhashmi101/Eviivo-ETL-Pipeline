@@ -6,12 +6,17 @@
   "scripts": {
     "test": "node --test",
     "init": "node src/init-db.js",
-    "reset-db": "node src/init-db.js",
+    "migrate": "node src/init-db.js",
+    "migrate:data": "node scripts/migrate-local-data.js",
     "import": "node src/importData.js",
     "views": "node src/createViews.js",
     "server": "node src/server.js",
+    "start": "node src/server.js",
     "watch": "node src/watcher.js",
     "dev": "concurrently \"npm run server\" \"npm run watch\""
+  },
+  "engines": {
+    "node": ">=20"
   },
   "keywords": [
     "eviivo",

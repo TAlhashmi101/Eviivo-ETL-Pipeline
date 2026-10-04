@@ -5,52 +5,118 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const multer = require('multer');
 const pool = require('./db');
 const { google } = require('googleapis');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 const GOOGLE_SHEETS_SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 const GOOGLE_SHEETS_READONLY_SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
 const ROOT_GOOGLE_CREDENTIALS = path.resolve(__dirname, '..', './credentials.json');
 const googleSheetsClients = new Map();
 const receiptUploadDir = path.join(__dirname, '..', 'public', 'uploads', 'receipts');
-fs.mkdirSync(receiptUploadDir, { recursive: true });
-const receiptStorage = multer.diskStorage({
-  destination: (_req, _file, callback) => callback(null, receiptUploadDir),
-  filename: (_req, file, callback) => {
-    const extension = path.extname(file.originalname).toLowerCase();
-    callback(null, `receipt-${Date.now()}-${Math.random().toString(36).slice(2, 10)}${extension}`);
-  }
-});
 const receiptUpload = multer({
-  storage: receiptStorage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 8 * 1024 * 1024 },
   fileFilter: (_req, file, callback) => callback(null, /^image\/(jpeg|png|webp|gif)$/.test(file.mimetype))
 });
 
+function validateGoogleServiceAccount(credentials, source) {
+  const clientEmail = String(credentials?.client_email || '').trim();
+  const privateKey = String(credentials?.private_key || '').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
+  if (credentials?.type !== 'service_account' || !clientEmail || !privateKey) {
+    throw new Error(`Invalid service-account credentials in ${source}: type, client_email, and private_key are required.`);
+  }
+  if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----') || !privateKey.endsWith('-----END PRIVATE KEY-----')) {
+    throw new Error(`Invalid private_key format in ${source}: expected a complete PRIVATE KEY PEM block.`);
+  }
+  if (privateKey.includes('\\n')) {
+    throw new Error(`Invalid private_key format in ${source}: escaped newlines were not normalized.`);
+  }
+  return { client_email: clientEmail, private_key: privateKey };
+}
+
 function loadGoogleServiceAccount(keyFile) {
-  let credentials;
   try {
-    credentials = JSON.parse(fs.readFileSync(keyFile, 'utf8'));
+    return validateGoogleServiceAccount(JSON.parse(fs.readFileSync(keyFile, 'utf8')), keyFile);
   } catch (error) {
     throw new Error(`Unable to read Google credentials from ${keyFile}: ${error.message}`);
   }
+}
 
-  const clientEmail = String(credentials.client_email || '').trim();
-  const privateKey = String(credentials.private_key || '').replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim();
-  if (credentials.type !== 'service_account' || !clientEmail || !privateKey) {
-    throw new Error(`Invalid service-account credentials in ${keyFile}: type, client_email, and private_key are required.`);
+function serviceAccountFromEnvironment() {
+  const serialized = String(process.env.GOOGLE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (!serialized) return null;
+  try {
+    return validateGoogleServiceAccount(JSON.parse(serialized), 'GOOGLE_SERVICE_ACCOUNT_JSON');
+  } catch (error) {
+    throw new Error(`Unable to parse GOOGLE_SERVICE_ACCOUNT_JSON: ${error.message}`);
   }
-  if (!privateKey.startsWith('-----BEGIN PRIVATE KEY-----') || !privateKey.endsWith('-----END PRIVATE KEY-----')) {
-    throw new Error(`Invalid private_key format in ${keyFile}: expected a complete PRIVATE KEY PEM block.`);
+}
+
+function receiptStorageSettings() {
+  const url = String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const serviceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  const bucket = String(process.env.SUPABASE_STORAGE_BUCKET || 'receipts').trim();
+  if (url && serviceKey) return { url, serviceKey, bucket };
+  if (process.env.VERCEL) {
+    throw new Error('Receipt uploads on Vercel require SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.');
   }
-  if (privateKey.includes('\\n')) {
-    throw new Error(`Invalid private_key format in ${keyFile}: escaped newlines were not normalized.`);
+  return null;
+}
+
+async function storeReceipt(file) {
+  const extensionByType = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };
+  const fileName = `receipt-${crypto.randomUUID()}${extensionByType[file.mimetype] || ''}`;
+  const settings = receiptStorageSettings();
+  if (settings) {
+    const upload = await fetch(`${settings.url}/storage/v1/object/${encodeURIComponent(settings.bucket)}/${fileName}`, {
+      method: 'POST',
+      headers: {
+        apikey: settings.serviceKey,
+        Authorization: `Bearer ${settings.serviceKey}`,
+        'Content-Type': file.mimetype,
+        'x-upsert': 'false'
+      },
+      body: file.buffer
+    });
+    if (!upload.ok) {
+      const detail = await upload.text();
+      throw new Error(`Supabase receipt upload failed (${upload.status}): ${detail}`);
+    }
+    return `${settings.url}/storage/v1/object/public/${encodeURIComponent(settings.bucket)}/${fileName}`;
   }
 
-  return { client_email: clientEmail, private_key: privateKey };
+  fs.mkdirSync(receiptUploadDir, { recursive: true });
+  fs.writeFileSync(path.join(receiptUploadDir, fileName), file.buffer);
+  return `/uploads/receipts/${fileName}`;
+}
+
+async function deleteReceipt(receiptUrl) {
+  const settings = receiptStorageSettings();
+  if (settings && receiptUrl.startsWith(`${settings.url}/storage/v1/object/public/${encodeURIComponent(settings.bucket)}/`)) {
+    const objectName = decodeURIComponent(receiptUrl.slice(`${settings.url}/storage/v1/object/public/${encodeURIComponent(settings.bucket)}/`.length));
+    const response = await fetch(`${settings.url}/storage/v1/object/${encodeURIComponent(settings.bucket)}`, {
+      method: 'DELETE',
+      headers: {
+        apikey: settings.serviceKey,
+        Authorization: `Bearer ${settings.serviceKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ prefixes: [objectName] })
+    });
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new Error(`Supabase receipt deletion failed (${response.status}): ${detail}`);
+    }
+    return;
+  }
+
+  if (receiptUrl.startsWith('/uploads/receipts/')) {
+    const receiptPath = path.join(__dirname, '..', 'public', receiptUrl.replace(/^\//, '').replaceAll('/', path.sep));
+    if (fs.existsSync(receiptPath)) fs.unlinkSync(receiptPath);
+  }
 }
 
 async function getGoogleSheetsClient(scopes = GOOGLE_SHEETS_SCOPES) {
@@ -64,19 +130,20 @@ async function getGoogleSheetsClient(scopes = GOOGLE_SHEETS_SCOPES) {
     path.resolve(__dirname, '..', 'google-credentials.json.json')
   ].filter(Boolean);
   const keyFile = candidatePaths.find(candidate => fs.existsSync(candidate));
-  if (!keyFile) {
+  const environmentCredentials = serviceAccountFromEnvironment();
+  if (!keyFile && !environmentCredentials) {
     const configuredHint = configuredPath ? `Configured path does not exist: ${configuredPath}` : 'GOOGLE_APPLICATION_CREDENTIALS is not set';
-    throw new Error(`Missing credentials.json file or GOOGLE_APPLICATION_CREDENTIALS env variable. ${configuredHint}`);
+    throw new Error(`Missing GOOGLE_SERVICE_ACCOUNT_JSON, credentials.json, or GOOGLE_APPLICATION_CREDENTIALS. ${configuredHint}`);
   }
 
   const clientPromise = (async () => {
     try {
-      const credentials = loadGoogleServiceAccount(keyFile);
+      const credentials = environmentCredentials || loadGoogleServiceAccount(keyFile);
       const auth = new google.auth.GoogleAuth({ credentials, scopes });
       await auth.getClient();
       return google.sheets({ version: 'v4', auth });
     } catch (error) {
-      throw new Error(`Google Sheets authentication failed using ${keyFile}: ${error.message}`);
+      throw new Error(`Google Sheets authentication failed: ${error.message}`);
     }
   })();
   googleSheetsClients.set(scopeKey, clientPromise);
@@ -91,155 +158,6 @@ async function getGoogleSheetsClient(scopes = GOOGLE_SHEETS_SCOPES) {
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
-
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS reservation_payments (
-        payment_id SERIAL PRIMARY KEY,
-        booking_reference VARCHAR(100) NOT NULL,
-        order_reference VARCHAR(100),
-        amount NUMERIC(10, 2) NOT NULL,
-        payment_method VARCHAR(50) NOT NULL,
-        card_brand VARCHAR(50),
-        card_last_four VARCHAR(4),
-        description TEXT,
-        payment_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        user_name VARCHAR(255) NOT NULL DEFAULT 'Portal User',
-        last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS idx_payments_booking_ref ON reservation_payments(booking_reference);
-
-      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS company_name VARCHAR(255);
-      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS company_vat VARCHAR(100);
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS property_name VARCHAR(255);
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS unique_payment_key VARCHAR(255);
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS currency VARCHAR(10) DEFAULT 'GBP';
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_status VARCHAR(100);
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_date TIMESTAMP;
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS user_name VARCHAR(255) NOT NULL DEFAULT 'Eviivo Import';
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
-      ALTER TABLE payments ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN NOT NULL DEFAULT FALSE;
-      ALTER TABLE reservation_payments ADD COLUMN IF NOT EXISTS user_name VARCHAR(255) NOT NULL DEFAULT 'Portal User';
-      ALTER TABLE reservation_payments ADD COLUMN IF NOT EXISTS last_updated_date_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
-      UPDATE payments
-      SET user_name = COALESCE(NULLIF(raw_data->>'UserName', ''), NULLIF(raw_data->>'User', ''), user_name),
-          last_updated_date_time = COALESCE(
-            CASE WHEN raw_data->>'LastUpdatedDateTime' ~ '^\\d{1,2}-[A-Za-z]{3}-\\d{2,4} \\d{1,2}:\\d{2}'
-              THEN to_timestamp(raw_data->>'LastUpdatedDateTime', 'DD-Mon-YY HH24:MI:SS.MS')::timestamp
-            END,
-            last_updated_date_time
-          )
-      WHERE raw_data ?| ARRAY['UserName', 'User', 'LastUpdatedDateTime'];
-      DO $$
-      DECLARE constraint_record RECORD;
-      BEGIN
-        FOR constraint_record IN
-          SELECT c.conname
-          FROM pg_constraint c
-          JOIN pg_class t ON t.oid = c.conrelid
-          JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(c.conkey)
-          WHERE t.relname = 'payments'
-            AND c.contype IN ('u', 'p')
-          GROUP BY c.conname
-          HAVING COUNT(*) = 1 AND BOOL_AND(a.attname = 'payment_id')
-        LOOP
-          EXECUTE format('ALTER TABLE payments DROP CONSTRAINT IF EXISTS %I', constraint_record.conname);
-        END LOOP;
-      END $$;
-      DROP INDEX IF EXISTS payments_payment_id_key;
-      DROP INDEX IF EXISTS payments_payment_id_unique;
-      DROP INDEX IF EXISTS payments_identity_idx;
-      ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_identity;
-      DELETE FROM payments older
-      USING payments newer
-      WHERE older.payment_id = newer.payment_id
-        AND older.booking_reference IS NOT DISTINCT FROM newer.booking_reference
-        AND (older.last_updated_date_time, older.id) < (newer.last_updated_date_time, newer.id);
-      CREATE UNIQUE INDEX IF NOT EXISTS payments_payment_booking_unique_idx
-        ON payments(payment_id, booking_reference);
-      CREATE UNIQUE INDEX IF NOT EXISTS payments_unique_payment_key_idx ON payments(unique_payment_key);
-      CREATE INDEX IF NOT EXISTS idx_imported_payments_booking_ref
-        ON payments(booking_reference) WHERE is_deleted = FALSE;
-      UPDATE payments SET payment_date = received_date_time WHERE payment_date IS NULL AND received_date_time IS NOT NULL;
-      UPDATE payments SET received_date_time = payment_date WHERE received_date_time IS NULL AND payment_date IS NOT NULL;
-      CREATE TABLE IF NOT EXISTS task_mapping_presets (
-        preset_id SERIAL PRIMARY KEY,
-        task_type VARCHAR(30) NOT NULL,
-        preset_name VARCHAR(120) NOT NULL,
-        mapping JSONB NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (task_type, preset_name)
-      );
-      CREATE INDEX IF NOT EXISTS idx_bookings_check_in ON bookings(check_in);
-      CREATE INDEX IF NOT EXISTS idx_bookings_check_out ON bookings(check_out);
-      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS address_line TEXT;
-      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS city VARCHAR(120);
-      ALTER TABLE bookings ADD COLUMN IF NOT EXISTS postcode VARCHAR(30);
-      CREATE TABLE IF NOT EXISTS reservation_charges (
-        charge_id SERIAL PRIMARY KEY,
-        booking_reference VARCHAR(100) NOT NULL,
-        category VARCHAR(100) NOT NULL DEFAULT 'Ad Hoc',
-        description TEXT NOT NULL,
-        amount NUMERIC(10, 2) NOT NULL CHECK (amount > 0),
-        charge_date TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS idx_charges_booking_ref ON reservation_charges(booking_reference);
-      CREATE TABLE IF NOT EXISTS booking_cards (
-        card_id SERIAL PRIMARY KEY,
-        booking_reference VARCHAR(100) NOT NULL,
-        cardholder_name VARCHAR(255) NOT NULL,
-        card_brand VARCHAR(50),
-        last_four VARCHAR(4),
-        expiry_month VARCHAR(2),
-        expiry_year VARCHAR(4),
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE TABLE IF NOT EXISTS booking_messages (
-        message_id SERIAL PRIMARY KEY,
-        booking_reference VARCHAR(100) NOT NULL,
-        message_type VARCHAR(40) NOT NULL DEFAULT 'Internal Note',
-        message_text TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS idx_booking_cards_ref ON booking_cards(booking_reference);
-      CREATE INDEX IF NOT EXISTS idx_booking_messages_ref ON booking_messages(booking_reference);
-      CREATE TABLE IF NOT EXISTS petty_expenses (
-        id SERIAL PRIMARY KEY,
-        property_name VARCHAR(255) NOT NULL,
-        manager_name VARCHAR(255) NOT NULL,
-        expense_date DATE NOT NULL,
-        description TEXT NOT NULL,
-        amount NUMERIC(12, 2) NOT NULL CHECK (amount > 0),
-        receipt_image_url TEXT,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-      );
-      CREATE INDEX IF NOT EXISTS idx_petty_expenses_property_date ON petty_expenses(property_name, expense_date);
-      ALTER TABLE petty_expenses ALTER COLUMN amount TYPE NUMERIC(10, 2) USING ROUND(amount::numeric, 2);
-      CREATE TABLE IF NOT EXISTS monthly_settlements (
-        id SERIAL PRIMARY KEY,
-        property_name VARCHAR(255) NOT NULL,
-        manager_name VARCHAR(255) NOT NULL,
-        settlement_month VARCHAR(7) NOT NULL CHECK (settlement_month ~ '^[0-9]{4}-(0[1-9]|1[0-2])$'),
-        expected_cash NUMERIC(12, 2) NOT NULL DEFAULT 0,
-        total_expenses NUMERIC(12, 2) NOT NULL DEFAULT 0,
-        actual_cash_in_hand NUMERIC(12, 2) NOT NULL DEFAULT 0 CHECK (actual_cash_in_hand >= 0),
-        variance NUMERIC(12, 2) NOT NULL DEFAULT 0,
-        status VARCHAR(20) NOT NULL CHECK (status IN ('Balanced', 'Shortage', 'Overage')),
-        is_locked BOOLEAN NOT NULL DEFAULT FALSE,
-        locked_at TIMESTAMP,
-        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (property_name, settlement_month)
-      );
-      CREATE INDEX IF NOT EXISTS idx_monthly_settlements_month ON monthly_settlements(settlement_month, property_name);
-    `);
-    console.log('✅ DB Schema Synchronized (Payments, Corporate & Notes).');
-  } catch (err) {
-    console.error('⚠️ DB Migration notice:', err.message);
-  }
-})();
 
 // ============================================================================
 // [CORE-LOGIC]: GROUP PAYMENTS DISTRIBUTION ENGINE
@@ -579,6 +497,7 @@ function settlementStatus(variance) {
 }
 
 app.post('/api/expenses', receiptUpload.single('receipt'), async (req, res) => {
+  let uploadedReceiptUrl = null;
   try {
     const propertyName = String(req.body.property_name || '').trim();
     const managerName = String(req.body.manager_name || '').trim();
@@ -586,24 +505,28 @@ app.post('/api/expenses', receiptUpload.single('receipt'), async (req, res) => {
     const description = String(req.body.description || '').trim();
     const amount = Math.round((Number(req.body.amount) + Number.EPSILON) * 100) / 100;
     if (!propertyName || propertyName === 'ALL' || !managerName || !validCalendarDate(expenseDate) || !description || !Number.isFinite(amount) || amount <= 0) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(400).json({ error: 'Property, manager, valid date, description, and a positive amount are required.' });
     }
     const month = expenseDate.slice(0, 7);
     const locked = await pool.query('SELECT 1 FROM monthly_settlements WHERE LOWER(property_name) = LOWER($1) AND settlement_month = $2 AND is_locked = TRUE', [propertyName, month]);
     if (locked.rowCount) {
-      if (req.file) fs.unlinkSync(req.file.path);
       return res.status(409).json({ error: 'This month is already locked for the selected property.' });
     }
-    const receiptImageUrl = req.file ? `/uploads/receipts/${req.file.filename}` : null;
+    uploadedReceiptUrl = req.file ? await storeReceipt(req.file) : null;
     const result = await pool.query(`
       INSERT INTO petty_expenses (property_name, manager_name, expense_date, description, amount, receipt_image_url)
       VALUES ($1, $2, $3::DATE, $4, $5::NUMERIC(10, 2), $6)
       RETURNING id, property_name, manager_name, TO_CHAR(expense_date, 'YYYY-MM-DD') AS expense_date, description, amount, receipt_image_url, created_at;
-    `, [propertyName, managerName, expenseDate, description, amount.toFixed(2), receiptImageUrl]);
+    `, [propertyName, managerName, expenseDate, description, amount.toFixed(2), uploadedReceiptUrl]);
     res.status(201).json(result.rows[0]);
   } catch (err) {
-    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
+    if (uploadedReceiptUrl) {
+      try {
+        await deleteReceipt(uploadedReceiptUrl);
+      } catch (cleanupError) {
+        console.error('Receipt cleanup failed after expense creation error:', cleanupError.message);
+      }
+    }
     res.status(400).json({ error: err.message });
   }
 });
@@ -641,10 +564,7 @@ app.delete('/api/expenses/:id', async (req, res) => {
     const locked = await pool.query('SELECT 1 FROM monthly_settlements WHERE LOWER(property_name) = LOWER($1) AND settlement_month = $2 AND is_locked = TRUE', [expense.property_name, expense.expense_month]);
     if (locked.rowCount) return res.status(409).json({ error: 'This month is already locked for the selected property.' });
     await pool.query('DELETE FROM petty_expenses WHERE id = $1', [id]);
-    if (expense.receipt_image_url && expense.receipt_image_url.startsWith('/uploads/receipts/')) {
-      const receiptPath = path.join(__dirname, '..', 'public', expense.receipt_image_url.replace(/^\//, '').replaceAll('/', path.sep));
-      if (fs.existsSync(receiptPath)) fs.unlinkSync(receiptPath);
-    }
+    if (expense.receipt_image_url) await deleteReceipt(expense.receipt_image_url);
     res.json({ success: true, id });
   } catch (err) { res.status(400).json({ error: err.message }); }
 });
@@ -2020,4 +1940,9 @@ app.post('/api/operations/send-cliq', async (req, res) => {
 // ============================================================================
 // [SECTION-09]: SERVER BOOTSTRAPPER
 // ============================================================================
-app.listen(PORT, () => console.log(`🚀 Hospitality Management Portal active at: http://localhost:${PORT}`));
+if (require.main === module) {
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => console.log(`Hospitality Management Portal active at http://localhost:${port}`));
+}
+
+module.exports = app;
