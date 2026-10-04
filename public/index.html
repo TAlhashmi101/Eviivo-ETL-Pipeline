@@ -169,6 +169,7 @@
         <button type="button" class="sidebar-nav-item" data-tab="ops"><span class="sidebar-nav-icon"><i class="fa-solid fa-bell-concierge"></i></span><span class="sidebar-nav-text">Daily Handover</span></button>
         <button type="button" class="sidebar-nav-item" data-tab="calendar"><span class="sidebar-nav-icon"><i class="fa-solid fa-calendar-days"></i></span><span class="sidebar-nav-text">Calendar</span></button>
         <button type="button" class="sidebar-nav-item" data-tab="reconciliation"><span class="sidebar-nav-icon"><i class="fa-solid fa-scale-balanced"></i></span><span class="sidebar-nav-text">Reconciliation</span></button>
+        <button type="button" class="sidebar-nav-item" data-tab="report-data"><span class="sidebar-nav-icon"><i class="fa-solid fa-table"></i></span><span class="sidebar-nav-text">Report Data</span></button>
 
         <!-- Temporary disable - leave commented and intact -->
         <!--
@@ -229,6 +230,41 @@
   <!-- [SECTION-02]: FULL-WIDTH MAIN APP CONTAINER                           -->
   <!-- ===================================================================== -->
   <main class="w-full px-4 py-5 space-y-5 no-print">
+
+    <section id="tab-content-report-data" class="hidden space-y-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900 dark:text-white">Eviivo Report Data</h2>
+          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Browse source report columns, filter like a spreadsheet, and manage bookings.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="loadReportData(true)" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-white"><i class="fa-solid fa-rotate mr-1"></i>Refresh</button>
+          <button id="report-data-add-booking" onclick="openNewBookingModal('report-data')" class="px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"><i class="fa-solid fa-plus mr-1"></i>Add Booking</button>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="report-data-bookings-tab" onclick="setReportDataType('bookings')" class="px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white">Booking Report</button>
+        <button id="report-data-payments-tab" onclick="setReportDataType('payments')" class="px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300">Payment Report (AM–BW)</button>
+        <input id="report-data-search" oninput="reportDataPage=0;renderReportDataTable()" type="search" placeholder="Search all columns..." class="ml-auto w-full sm:w-64 px-3 py-2 text-xs rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white">
+      </div>
+      <div class="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden shadow-sm">
+        <div class="flex items-center justify-between gap-3 px-4 py-2 border-b border-slate-200 dark:border-slate-700 text-[11px]">
+          <div id="report-data-status" class="text-slate-500 dark:text-slate-400" role="status" aria-live="polite">Choose a report to load.</div>
+          <button onclick="clearReportDataFilters()" class="text-emerald-700 dark:text-emerald-300 hover:underline">Clear filters</button>
+        </div>
+        <div class="report-data-scroll overflow-auto max-h-[72vh]">
+          <table class="min-w-full border-collapse text-left text-[11px]">
+            <thead id="report-data-head" class="sticky top-0 z-10 bg-slate-100 dark:bg-slate-800"></thead>
+            <tbody id="report-data-body" class="divide-y divide-slate-100 dark:divide-slate-800"></tbody>
+          </table>
+        </div>
+        <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-slate-200 dark:border-slate-700 text-[10px] text-slate-500">
+          <span id="report-data-page-label">0 rows</span>
+          <div class="flex gap-1"><button id="report-data-prev" onclick="changeReportDataPage(-1)" class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40">Previous</button><button id="report-data-next" onclick="changeReportDataPage(1)" class="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 disabled:opacity-40">Next</button></div>
+        </div>
+      </div>
+      <div id="report-data-filter-root"></div>
+    </section>
 
     <!-- TAB 1: EXECUTIVE ANALYTICS -->
     <div id="tab-content-analytics" class="space-y-5 hidden">
@@ -772,6 +808,45 @@
     const bookingCardTotalState = new Map();
     let currentAiReport = { type: 'daily_sales', rows: [], columns: [], title: 'No report loaded' };
     let currentReconciliation = { missing_in_system: [], missing_in_sheet: [], summary: {} };
+    let reportDataType = 'bookings';
+    let reportDataRows = [];
+    let reportDataColumns = [];
+    let reportDataPage = 0;
+    const REPORT_DATA_PAGE_SIZE = 100;
+    const reportDataFilters = new Map();
+    let reportDataSort = { column: '', direction: 'asc' };
+    let newBookingSource = 'ops';
+    const reportDataCanonicalColumns = {
+      bookingreference: 'booking_reference', orderreference: 'order_reference', property: 'property_name',
+      guestfirstname: 'guest_first_name', firstname: 'guest_first_name', guestlastname: 'guest_last_name',
+      lastname: 'guest_last_name', guestphone1: 'telephone', guestphone2: 'telephone', telephone: 'telephone',
+      guestemail: 'email', email: 'email', roomunitname: 'room_unit_name', roomunittype: 'room_unit_type',
+      bookingstatus: 'booking_status', status: 'booking_status', channel: 'channel', currency: 'currency',
+      bookingdate: 'booking_date', checkin: 'check_in', checkout: 'check_out', nights: 'nights',
+      adults: 'adults', children: 'children', otherrevenue: 'other_revenue',
+      totalrevenue: 'total_revenue', paidamount: 'paid_amount', otareference: 'ota_reference',
+      companyname: 'company_name', companyvat: 'company_vat', arrival: 'arrival',
+      paymentid: 'payment_id', receiveddatetime: 'received_date_time', bookeddate: 'booking_date',
+      checkindatetime: 'check_in', checkoutdatetime: 'check_out', paymentmethod: 'payment_method',
+      cardtype: 'card_type', cardlast4digits: 'card_last_four', username: 'user_name',
+      businessname: 'business_name', roomid: 'room_name', settledamount: 'amount'
+    };
+    const REPORT_DATA_COLUMN_ORDER = {
+      bookings: [
+        'Property', 'Booking Date', 'Booking Reference', 'Order Reference', 'OTA Reference', 'Group',
+        'Guest First Name', 'Guest Last Name', 'Check In', 'Check Out', 'Nights', 'Room/Unit Type',
+        'Rate Plan', 'Room/Unit Name', 'Beds', 'Adults', 'Children', 'Currency', 'Total Revenue',
+        'Paid Amount', 'Room/Unit Revenue', 'Other Revenue', 'Method', 'Source', 'Channel',
+        'Payment Method', 'Booking Status', 'Arrival', 'Guest Email', 'Guest Phone 1', 'Guest Phone 2',
+        'Booking Notes', 'Extras Booked Online', 'Promo Name', 'Promo Code', 'Promo Discount',
+        'Booking Date and Time', 'CompanyName', 'MemberId', 'Tag'
+      ],
+      payments: [
+        'ReceivedDateTime', 'PaymentID', 'Forename', 'business_name', 'RoomId', 'OrderReference',
+        'BookingReference', 'BookedDate', 'CheckinDatetime', 'CheckoutDatetime', 'PaymentMethod',
+        'CardType', 'CardLast4Digits', 'Description', 'UserName', 'Direct1'
+      ]
+    };
 
     const fmt = (num) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(num || 0);
     const cleanPaymentAmount = value => {
@@ -1154,6 +1229,8 @@
       if (e.key === 'Escape') {
         closeUniversalPanels();
         closeSearchDropdown();
+        document.getElementById('report-booking-editor')?.remove();
+        document.getElementById('report-data-filter-root').innerHTML = '';
       }
     });
 
@@ -1176,7 +1253,7 @@
     // --- TABS & REFRESH LOGIC ---
     function switchTab(tab) {
       activeTab = tab;
-      const tabMap = { analytics: 'analytics', unpaid: 'unpaid', ops: 'ops', calendar: 'cal', reconciliation: 'reconciliation' };
+      const tabMap = { analytics: 'analytics', unpaid: 'unpaid', ops: 'ops', calendar: 'cal', reconciliation: 'reconciliation', 'report-data': 'report-data' };
 
       Object.keys(tabMap).forEach(key => {
         const content = document.getElementById(`tab-content-${tabMap[key]}`);
@@ -1210,6 +1287,250 @@
       if (tab === 'reconciliation' && typeof renderReconciliationTable === 'function') {
         renderReconciliationTable();
       }
+      if (tab === 'report-data') loadReportData();
+    }
+
+    async function loadReportData(force = false) {
+      const status = document.getElementById('report-data-status');
+      if (!status || (activeTab !== 'report-data' && !force)) return;
+      status.textContent = 'Loading report data...';
+      try {
+        const response = await fetch(`/api/report-data?type=${encodeURIComponent(reportDataType)}`, { cache: 'no-store' });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error || `HTTP ${response.status}`);
+        reportDataRows = Array.isArray(payload.rows) ? payload.rows : [];
+        const keys = new Set();
+        reportDataRows.forEach(row => {
+          const raw = row.raw_data && typeof row.raw_data === 'object' && !Array.isArray(row.raw_data) ? row.raw_data : {};
+          Object.keys(raw).filter(key => !key.startsWith('_portal_')).forEach(key => keys.add(key));
+        });
+        const preferredColumns = REPORT_DATA_COLUMN_ORDER[reportDataType] || [];
+        reportDataColumns = [
+          ...preferredColumns,
+          ...(reportDataType === 'bookings' ? [...keys].filter(key => !preferredColumns.some(column =>
+            column.toLowerCase().replace(/[^a-z0-9]/g, '') === key.toLowerCase().replace(/[^a-z0-9]/g, '')
+          )) : [])
+        ];
+        if (!reportDataColumns.length && reportDataRows.length) {
+          reportDataColumns = Object.keys(reportDataRows[0]).filter(key => !['raw_data', 'id', 'created_at', 'unique_payment_key'].includes(key));
+        }
+        status.textContent = `${reportDataRows.length.toLocaleString()} ${reportDataType} rows · ${reportDataColumns.length} report columns`;
+        renderReportDataTable();
+      } catch (error) {
+        status.textContent = `Unable to load report data: ${error.message}`;
+        showToast('Unable to load report data', 'error');
+      }
+    }
+
+    function setReportDataType(type) {
+      if (!['bookings', 'payments'].includes(type)) return;
+      reportDataType = type;
+      reportDataFilters.clear();
+      reportDataSort = { column: '', direction: 'asc' };
+      reportDataPage = 0;
+      document.getElementById('report-data-search').value = '';
+      document.getElementById('report-data-bookings-tab').className = type === 'bookings'
+        ? 'px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
+        : 'px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300';
+      document.getElementById('report-data-payments-tab').className = type === 'payments'
+        ? 'px-3 py-2 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
+        : 'px-3 py-2 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300';
+      document.getElementById('report-data-add-booking').classList.toggle('hidden', type !== 'bookings');
+      loadReportData(true);
+    }
+
+    function reportDataRaw(row) {
+      return row.raw_data && typeof row.raw_data === 'object' && !Array.isArray(row.raw_data) ? row.raw_data : {};
+    }
+
+    function reportDataCell(row, column) {
+      const raw = reportDataRaw(row);
+      const canonicalColumn = reportDataCanonicalColumns[column.toLowerCase().replace(/[^a-z0-9]/g, '')] || column;
+      const value = Object.prototype.hasOwnProperty.call(raw, column) ? raw[column] : row[canonicalColumn];
+      return value === null || value === undefined ? '' : String(value);
+    }
+
+    function renderReportDataTable() {
+      const head = document.getElementById('report-data-head');
+      const body = document.getElementById('report-data-body');
+      if (!head || !body) return;
+      const search = document.getElementById('report-data-search')?.value.trim().toLowerCase() || '';
+      let filtered = reportDataRows.map((row, index) => ({ row, index })).filter(({ row }) => {
+        if (search && !reportDataColumns.some(column => reportDataCell(row, column).toLowerCase().includes(search))) return false;
+        for (const [column, selected] of reportDataFilters) {
+          if (!selected.has(reportDataCell(row, column))) return false;
+        }
+        return true;
+      });
+      if (reportDataSort.column) {
+        const column = reportDataSort.column;
+        const direction = reportDataSort.direction === 'asc' ? 1 : -1;
+        filtered.sort((left, right) => {
+          const a = reportDataCell(left.row, column).trim();
+          const b = reportDataCell(right.row, column).trim();
+          const numberA = Number(a.replace(/[£,\s]/g, ''));
+          const numberB = Number(b.replace(/[£,\s]/g, ''));
+          if (a && b && Number.isFinite(numberA) && Number.isFinite(numberB)) return (numberA - numberB) * direction;
+          return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }) * direction;
+        });
+      }
+
+      head.innerHTML = `<tr>${reportDataColumns.map(column => {
+        const active = reportDataFilters.has(column);
+        const sortIcon = reportDataSort.column === column ? (reportDataSort.direction === 'asc' ? 'fa-arrow-up-short-wide' : 'fa-arrow-down-wide-short') : 'fa-sort';
+        return `<th class="relative min-w-40 max-w-64 px-2 py-2 border-r border-slate-200 dark:border-slate-700 font-semibold text-slate-700 dark:text-slate-200 whitespace-nowrap">
+          <div class="flex items-center gap-1"><button data-report-sort="${escapeHtml(column)}" class="max-w-52 truncate hover:text-emerald-500" title="Sort by ${escapeHtml(column)}">${escapeHtml(column)} <i class="fa-solid ${sortIcon} ml-1 text-[9px]"></i></button>
+          <button data-report-filter="${escapeHtml(column)}" class="shrink-0 rounded px-1.5 py-1 ${active ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700'}" title="Filter ${escapeHtml(column)}"><i class="fa-solid fa-filter"></i></button></div>
+        </th>`;
+      }).join('')}${reportDataType === 'bookings' ? '<th class="sticky right-0 min-w-28 px-2 py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200">Actions</th>' : ''}</tr>`;
+
+      const pageCount = Math.max(1, Math.ceil(filtered.length / REPORT_DATA_PAGE_SIZE));
+      reportDataPage = Math.min(reportDataPage, pageCount - 1);
+      const pageRows = filtered.slice(reportDataPage * REPORT_DATA_PAGE_SIZE, (reportDataPage + 1) * REPORT_DATA_PAGE_SIZE);
+      body.innerHTML = pageRows.map(({ row, index }) => `<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/70">${reportDataColumns.map(column => {
+        const value = reportDataCell(row, column);
+        return `<td class="max-w-64 px-2 py-2 text-slate-700 dark:text-slate-300 border-r border-slate-100 dark:border-slate-800"><div class="max-w-64 truncate" title="${escapeHtml(value)}">${escapeHtml(value)}</div></td>`;
+      }).join('')}${reportDataType === 'bookings' ? `<td class="sticky right-0 whitespace-nowrap bg-white dark:bg-slate-900 px-2 py-2"><button data-report-edit="${index}" class="px-2 py-1 rounded bg-sky-700 hover:bg-sky-600 text-white" title="Edit booking"><i class="fa-solid fa-pen"></i></button> <button data-report-delete="${index}" class="px-2 py-1 rounded bg-rose-800 hover:bg-rose-700 text-white" title="Delete booking"><i class="fa-solid fa-trash"></i></button></td>` : ''}</tr>`).join('') || `<tr><td colspan="${Math.max(reportDataColumns.length, 1) + (reportDataType === 'bookings' ? 1 : 0)}" class="px-4 py-8 text-center text-slate-500">No rows match these filters.</td></tr>`;
+
+      head.querySelectorAll('[data-report-sort]').forEach(button => button.addEventListener('click', () => {
+        const column = button.dataset.reportSort;
+        reportDataSort = { column, direction: reportDataSort.column === column && reportDataSort.direction === 'asc' ? 'desc' : 'asc' };
+        reportDataPage = 0;
+        renderReportDataTable();
+      }));
+      head.querySelectorAll('[data-report-filter]').forEach(button => button.addEventListener('click', event => openReportDataFilter(button.dataset.reportFilter, event.currentTarget)));
+      body.querySelectorAll('[data-report-edit]').forEach(button => button.addEventListener('click', () => openReportBookingEditor(Number(button.dataset.reportEdit))));
+      body.querySelectorAll('[data-report-delete]').forEach(button => button.addEventListener('click', () => deleteReportBooking(Number(button.dataset.reportDelete))));
+      const shown = document.getElementById('report-data-status');
+      if (shown) shown.textContent = `${filtered.length.toLocaleString()} of ${reportDataRows.length.toLocaleString()} ${reportDataType} rows · ${reportDataColumns.length} report columns`;
+      const start = filtered.length ? reportDataPage * REPORT_DATA_PAGE_SIZE + 1 : 0;
+      const end = Math.min((reportDataPage + 1) * REPORT_DATA_PAGE_SIZE, filtered.length);
+      document.getElementById('report-data-page-label').textContent = `${start.toLocaleString()}–${end.toLocaleString()} of ${filtered.length.toLocaleString()} rows`;
+      document.getElementById('report-data-prev').disabled = reportDataPage === 0;
+      document.getElementById('report-data-next').disabled = reportDataPage >= pageCount - 1;
+    }
+
+    function changeReportDataPage(delta) {
+      reportDataPage = Math.max(0, reportDataPage + delta);
+      renderReportDataTable();
+    }
+
+    function openReportDataFilter(column, button) {
+      const root = document.getElementById('report-data-filter-root');
+      const values = [...new Set(reportDataRows.map(row => reportDataCell(row, column)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      const selected = reportDataFilters.get(column);
+      const bounds = button.getBoundingClientRect();
+      root.innerHTML = `<div class="fixed z-[110] w-72 max-h-[75vh] overflow-hidden rounded-lg border border-slate-600 bg-slate-900 shadow-2xl" style="left:${Math.min(bounds.left, window.innerWidth - 300)}px;top:${Math.min(bounds.bottom + 4, window.innerHeight - 420)}px">
+        <div class="p-2 border-b border-slate-700"><div class="text-[11px] font-bold text-white truncate mb-2">Filter: ${escapeHtml(column)}</div><input id="report-filter-search" type="search" placeholder="Search values..." class="w-full rounded bg-slate-950 border border-slate-700 px-2 py-1.5 text-[11px] text-white"></div>
+        <div class="flex justify-between px-2 py-1 border-b border-slate-700"><button id="report-filter-select-all" class="text-[10px] text-emerald-300">Select all</button><button id="report-filter-clear-all" class="text-[10px] text-emerald-300">Clear</button></div>
+        <div id="report-filter-options" class="max-h-64 overflow-auto p-2 space-y-1">${values.map((value, index) => `<label class="report-filter-option flex items-center gap-2 text-[10px] text-slate-200"><input type="checkbox" value="${escapeHtml(value)}" ${!selected || selected.has(value) ? 'checked' : ''}><span class="truncate" title="${escapeHtml(value || '(Blanks)')}">${escapeHtml(value || '(Blanks)')}</span></label>`).join('')}</div>
+        <div class="flex justify-end gap-2 p-2 border-t border-slate-700"><button id="report-filter-cancel" class="px-2 py-1 text-[10px] text-slate-300">Cancel</button><button id="report-filter-apply" class="px-2 py-1 rounded bg-emerald-600 text-[10px] font-bold text-white">Apply</button></div>
+      </div>`;
+      root.querySelector('#report-filter-search').addEventListener('input', event => {
+        const query = event.target.value.toLowerCase();
+        root.querySelectorAll('.report-filter-option').forEach(option => { option.hidden = !option.textContent.toLowerCase().includes(query); });
+      });
+      root.querySelector('#report-filter-select-all').addEventListener('click', () => root.querySelectorAll('#report-filter-options input').forEach(input => { input.checked = true; }));
+      root.querySelector('#report-filter-clear-all').addEventListener('click', () => root.querySelectorAll('#report-filter-options input').forEach(input => { input.checked = false; }));
+      root.querySelector('#report-filter-cancel').addEventListener('click', () => { root.innerHTML = ''; });
+      root.querySelector('#report-filter-apply').addEventListener('click', () => {
+        const checked = new Set([...root.querySelectorAll('#report-filter-options input:checked')].map(input => input.value));
+        if (checked.size === values.length) reportDataFilters.delete(column); else reportDataFilters.set(column, checked);
+        reportDataPage = 0;
+        root.innerHTML = '';
+        renderReportDataTable();
+      });
+    }
+
+    function clearReportDataFilters() {
+      reportDataFilters.clear();
+      reportDataSort = { column: '', direction: 'asc' };
+      reportDataPage = 0;
+      document.getElementById('report-data-search').value = '';
+      document.getElementById('report-data-filter-root').innerHTML = '';
+      renderReportDataTable();
+    }
+
+    function reportEditorValue(column, value) {
+      const key = column.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (['bookingdate', 'bookingdateandtime'].includes(key)) {
+        const timestamp = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/);
+        if (timestamp) return `${timestamp[3]}-${timestamp[2].padStart(2, '0')}-${timestamp[1].padStart(2, '0')}T${(timestamp[4] || '00').padStart(2, '0')}:${timestamp[5] || '00'}`;
+        const iso = value.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](\d{2}:\d{2}))?/);
+        return iso ? `${iso[1]}T${iso[2] || '00:00'}` : '';
+      }
+      if (!['checkin', 'checkout'].includes(key)) return value;
+      const iso = value.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (iso) return iso[1];
+      const slash = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      return slash ? `${slash[3]}-${slash[2].padStart(2, '0')}-${slash[1].padStart(2, '0')}` : '';
+    }
+
+    function openReportBookingEditor(index) {
+      const booking = reportDataRows[index];
+      if (!booking) return;
+      const raw = reportDataRaw(booking);
+      const fields = reportDataColumns.map(column => {
+        const value = reportEditorValue(column, reportDataCell(booking, column));
+        const key = column.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const type = ['checkin', 'checkout'].includes(key) ? 'date'
+          : ['bookingdate', 'bookingdateandtime'].includes(key) ? 'datetime-local'
+          : ['nights', 'adults', 'children'].includes(key) ? 'number'
+            : ['otherrevenue', 'totalrevenue', 'totalamount', 'paidamount'].includes(key) ? 'number' : 'text';
+        return { column, value, type };
+      });
+      const editor = document.createElement('div');
+      editor.id = 'report-booking-editor';
+      editor.className = 'fixed inset-0 z-[115] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3';
+      editor.innerHTML = `<form class="w-full max-w-5xl max-h-[92vh] overflow-hidden rounded-xl border border-slate-700 bg-slate-900 shadow-2xl" onsubmit="saveReportBooking(event)" data-booking-ref="${escapeHtml(booking.booking_reference || raw['Booking Reference'] || '')}">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-slate-700"><div><h3 class="text-sm font-bold text-white">Edit Booking</h3><p class="text-[10px] text-slate-400 mt-1">Update report fields; booking reference is fixed.</p></div><button type="button" onclick="document.getElementById('report-booking-editor').remove()" class="text-slate-400 hover:text-white text-xl">&times;</button></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 p-4 max-h-[70vh] overflow-auto">${fields.map(({ column, value, type }) => `<label class="block text-[10px] text-slate-400">${escapeHtml(column)}${column.toLowerCase().replace(/[^a-z0-9]/g, '') === 'bookingreference' ? '<span class="ml-1 text-slate-600">(locked)</span>' : ''}<input data-report-field="${escapeHtml(column)}" data-original="${escapeHtml(value)}" type="${type}" ${type === 'number' ? 'step="any"' : ''} value="${escapeHtml(value)}" ${column.toLowerCase().replace(/[^a-z0-9]/g, '') === 'bookingreference' ? 'readonly' : ''} class="mt-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-white"></label>`).join('')}</div>
+        <div id="report-booking-edit-status" class="px-4 text-[11px] text-rose-300" role="status"></div>
+        <div class="flex justify-end gap-2 p-3 border-t border-slate-700"><button type="button" onclick="document.getElementById('report-booking-editor').remove()" class="px-3 py-2 rounded bg-slate-800 text-xs text-slate-200">Cancel</button><button class="px-3 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white">Save changes</button></div>
+      </form>`;
+      document.body.appendChild(editor);
+    }
+
+    async function saveReportBooking(event) {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const ref = form.dataset.bookingRef;
+      const changes = {};
+      form.querySelectorAll('[data-report-field]').forEach(input => {
+        if (input.value !== input.dataset.original) changes[input.dataset.reportField] = input.value;
+      });
+      const status = document.getElementById('report-booking-edit-status');
+      if (!Object.keys(changes).length) {
+        status.textContent = 'No changes to save.';
+        return;
+      }
+      try {
+        const response = await fetch(`/api/report-data/bookings/${encodeURIComponent(ref)}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ changes })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        document.getElementById('report-booking-editor')?.remove();
+        showToast('Booking updated', 'success');
+        await loadReportData(true);
+      } catch (error) {
+        status.textContent = error.message;
+      }
+    }
+
+    async function deleteReportBooking(index) {
+      const booking = reportDataRows[index];
+      const ref = String(booking?.booking_reference || '').trim();
+      if (!ref || !confirm(`Delete booking ${ref}? Its portal payments and related booking records will also be removed.`)) return;
+      try {
+        const response = await fetch(`/api/reservations/${encodeURIComponent(ref)}`, { method: 'DELETE' });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+        showToast(`Booking ${ref} deleted`, 'success');
+        await loadReportData(true);
+      } catch (error) {
+        showToast(`Unable to delete booking: ${error.message}`, 'error');
+      }
     }
 
     async function triggerFullSystemRefresh() {
@@ -1224,6 +1545,7 @@
         if (activeTab === 'ai-reports') await runAiReport();
         if (activeTab === 'daily-tasks') await loadTaskWorkspace();
         if (activeTab === 'reconciliation') await loadMonthEndReconciliation();
+        if (activeTab === 'report-data') await loadReportData(true);
         const query = document.getElementById('global-booking-search')?.value.trim();
         if (query) await executeGlobalSearch(query); else closeSearchDropdown();
       } finally {
@@ -1616,6 +1938,7 @@
     }
 
     async function openNewBookingModal(source = 'ops') {
+      newBookingSource = source;
       const modal = document.getElementById('new-booking-modal');
       const form = document.getElementById('new-booking-form');
       const propertySelect = document.getElementById('new-booking-property');
@@ -1688,6 +2011,7 @@
         if (!response.ok) throw new Error(result.error || `Unable to create booking (HTTP ${response.status}).`);
         closeNewBookingModal();
         alert(`Booking ${result.booking_reference} created successfully.`);
+        if (newBookingSource === 'report-data') await loadReportData(true);
         await triggerFullSystemRefresh();
       } catch (error) {
         alert(`Unable to create booking: ${error.message}`);
@@ -1718,6 +2042,24 @@
       header.classList.add('bg-white', 'dark:bg-slate-800', 'border-slate-200', 'dark:border-slate-700');
       if (statusInfo.key === 'cancelled') header.classList.add('booking-modal-header-cancelled');
       if (statusInfo.key === 'parked') header.classList.add('booking-modal-header-parked');
+    }
+
+    function bookingCoreRevenue(booking, rawData = {}) {
+      const bookedAmount = Number(booking?.booked_amount);
+      if (booking?.booked_amount !== null && booking?.booked_amount !== undefined && Number.isFinite(bookedAmount)) return bookedAmount;
+      const reportTotal = cleanPaymentAmount(rawData['Total Revenue'] ?? rawData['Total Amount'] ?? booking?.total_revenue);
+      const otherRevenue = Math.max(0, cleanPaymentAmount(booking?.other_revenue ?? rawData['Other Revenue'] ?? rawData.other_revenue));
+      const sourceRoomRevenue = cleanPaymentAmount(rawData['Room/Unit Revenue'] ?? rawData['Room Unit Revenue'] ?? rawData.room_unit_revenue ?? rawData['Room Rate'] ?? rawData.room_rate);
+      const roomRevenue = Math.max(0, sourceRoomRevenue || (reportTotal
+        ? reportTotal >= otherRevenue ? reportTotal - otherRevenue : reportTotal
+        : 0));
+      const paidAmount = Math.max(0, cleanPaymentAmount(rawData['Paid Amount'] ?? rawData.Payment ?? booking?.paid_amount));
+      const paidDeposit = Math.min(otherRevenue, Math.max(0, paidAmount - roomRevenue));
+      const reportedOtherRevenue = Math.min(otherRevenue, Math.max(0, reportTotal - roomRevenue));
+      return Math.max(
+        roomRevenue,
+        reportTotal ? reportTotal - reportedOtherRevenue + paidDeposit : roomRevenue + paidDeposit
+      );
     }
 
     async function openUniversalModal(encodedData) {
@@ -1767,10 +2109,7 @@
       let chargesSum = parseFloat(b.total_charges || 0);
       const paymentHistory = Array.isArray(b.payment_history) ? b.payment_history : [];
       bookingCardPaymentState.set(ref, paymentHistory);
-      const roomUnitRevenue = [b.room_unit_revenue, rawData['Room/Unit Revenue'], rawData['room_unit_revenue'], rawData.room_rate, rawData['Room Rate']]
-        .map(value => parseFloat(value))
-        .find(Number.isFinite);
-      const totalBilled = cleanPaymentAmount(Number.isFinite(roomUnitRevenue) ? roomUnitRevenue : (b.booked_amount ?? b.total_revenue ?? 0));
+      const totalBilled = cleanPaymentAmount(bookingCoreRevenue(b, rawData));
       bookingCardTotalState.set(ref, totalBilled);
       const otherRevenue = parseFloat(b.other_revenue ?? rawData['Other Revenue'] ?? rawData.other_revenue ?? 0) || 0;
       const paymentsSum = paymentHistory.filter(payment => payment?.is_deleted !== true && payment?.is_deleted !== 'true').reduce((sum, payment) => sum + cleanPaymentAmount(payment?.amount), 0);
@@ -1801,7 +2140,8 @@
         </div>` : `<div class="flex items-center"><button type="button" class="rounded border border-slate-600 bg-slate-900 px-3 py-1.5 text-left"><span class="flex flex-col"><span class="text-xs text-slate-400">Ref: ${escapeHtml(ref)}</span><span class="text-sm font-semibold truncate max-w-[180px]">${escapeHtml(guestFirstName)} ${escapeHtml(guestLastName)}</span></span></button></div>`;
       const cancellationRevenue = totalBilled;
       const waivedDeposit = Math.min(otherRevenue, Math.max(0, Math.abs(parseFloat(b.total_deposit_waivers || 0))));
-      const remainingDeposit = Math.max(0, otherRevenue - waivedDeposit);
+      const paidDeposit = Math.min(otherRevenue, Math.max(0, cleanPaymentAmount(b.paid_deposit_amount)));
+      const remainingDeposit = Math.max(0, otherRevenue - paidDeposit - waivedDeposit);
       const depositNotice = otherRevenue > 0 ? `<div class="flex items-start gap-2 rounded border border-rose-300 bg-rose-100 px-3 py-2 text-xs text-slate-900 shadow-sm"><i class="fa-solid fa-circle-info text-lg"></i><div><div>Damage deposit outstanding: <strong>${fmt(remainingDeposit)}</strong> <button type="button" class="text-cyan-700 underline" onclick="waivePanelDeposit('${ref}', ${remainingDeposit.toFixed(2)})" ${remainingDeposit <= 0 ? 'disabled' : ''}>${remainingDeposit > 0 ? 'Waive' : 'Waived'}</button></div>${waivedDeposit > 0 ? `<div class="mt-1">${fmt(waivedDeposit)} waived</div>` : ''}</div></div>` : '';
 
       const formatPaymentAuditDate = value => {
